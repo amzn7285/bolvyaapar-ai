@@ -52,7 +52,9 @@ IMPORTANT: Respond ONLY with a valid JSON object matching the requested schema. 
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://dukaansaathi-ai-syed-gulam-ahmeds-projects.vercel.app',
+        'X-Title': 'DukaanSaathi AI'
       },
       body: JSON.stringify({
         model: 'google/gemini-2.0-flash-exp:free',

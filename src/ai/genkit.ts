@@ -1,3 +1,3 @@
 
-// This file is no longer used as Genkit has been replaced by direct OpenRouter fetch calls.
+// This file is no longer used as the project uses direct fetch calls to OpenRouter.
 export const ai = null;
