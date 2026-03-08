@@ -19,35 +19,23 @@ const GeneratePassiveBusinessLessonOutputSchema = z.object({
 export type GeneratePassiveBusinessLessonOutput = z.infer<typeof GeneratePassiveBusinessLessonOutputSchema>;
 
 export async function generatePassiveBusinessLesson(input: GeneratePassiveBusinessLessonInput): Promise<GeneratePassiveBusinessLessonOutput> {
-  const systemPrompt = `Generate a 2-sentence business or AI insight for a kirana shopkeeper based on a transaction. 
-Tone: Friendly. 
-Language: ${input.language}. 
-Respond ONLY with JSON: {"lesson_text": "..."}`;
+  const systemPrompt = `Generate a 2-sentence business insight for a kirana shopkeeper based on a transaction. 
+Language: ${input.language}. Respond ONLY with JSON: {"lesson_text": "..."}`;
 
-  const userMessage = `Transaction: ${input.productName} ${input.quantity || ''} ${input.unit || ''}. Customer: ${input.customerName || 'None'}. Price: ${input.price || 'None'}.`;
+  const userMessage = `Transaction: ${input.productName} ${input.quantity || ''}. Price: ${input.price || 'None'}.`;
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:9002';
+    const response = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://dukaansaathi-ai-syed-gulam-ahmeds-projects.vercel.app',
-        'X-Title': 'DukaanSaathi AI'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt, userMessage })
     });
 
     const data = await response.json();
     const cleanContent = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleanContent);
   } catch (error) {
-    return { lesson_text: "AI is currently offline. Focus on customer service!" };
+    return { lesson_text: "Focus on giving your customers the best service today!" };
   }
 }

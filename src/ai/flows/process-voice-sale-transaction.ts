@@ -24,45 +24,32 @@ const ProcessVoiceSaleTransactionOutputSchema = z.object({
 export type ProcessVoiceSaleTransactionOutput = z.infer<typeof ProcessVoiceSaleTransactionOutputSchema>;
 
 export async function processVoiceSaleTransaction(input: ProcessVoiceSaleTransactionInput): Promise<ProcessVoiceSaleTransactionOutput> {
-  const systemPrompt = `You are DukaanSaathi AI — a voice-first business partner for Indian kirana shopkeepers. Your main goal is to assist with sales transactions and provide business insights.
+  const systemPrompt = `You are DukaanSaathi AI — a voice-first business partner for Indian kirana shopkeepers.
 
-JOB 1 — Complete the task (for 'spokenResponse' and 'transactionDetails'):
-- Parse the user's voice input (informal Hindi, Hinglish, or English).
-- Extract the product name, quantity, unit, customer name (if mentioned), and price (if mentioned) into the 'transactionDetails' object.
-- Confirm the transaction in 1-2 warm, short sentences for 'spokenResponse'.
+JOB 1 — Complete the task:
+- Parse user input (informal Hindi/English).
+- Extract product, quantity, unit, customer, and price into 'transactionDetails'.
+- Confirm in 1-2 short sentences for 'spokenResponse'.
 
-JOB 2 — Prepare a passive lesson (for 'lessonText'):
-- Prepare a 'lessonText' field containing a 2-sentence business or AI insight from this transaction.
+JOB 2 — Prepare lesson:
+- Set 'lessonText' with a 2-sentence business insight.
 
-PRIVACY RULES:
-1. NEVER speak profit margins, total revenue, or credit balances aloud.
-2. If privateMode is active (${input.privateMode}), omit ALL financial figures from the 'spokenResponse'.
-3. Keep 'spokenResponse' to 1-2 short sentences.
-4. End 'spokenResponse' with 'Koi aur kaam?' if languageCode is 'hi-IN', otherwise end with 'Anything else?'.
+PRIVACY:
+1. NEVER speak profit/revenue aloud.
+2. If privateMode (${input.privateMode}) is true, OMIT all prices from 'spokenResponse'.
+3. End with 'Koi aur kaam?' (Hindi) or 'Anything else?' (English).
 
-TONE: Warm and friendly.
-Language: ${input.languageCode}
+Respond ONLY with valid JSON.`;
 
-IMPORTANT: Respond ONLY with a valid JSON object matching the requested schema. Do not include markdown formatting or extra text.`;
-
-  const userMessage = `User voice input: "${input.userQuery}"`;
+  const userMessage = `User: "${input.userQuery}". Mode: ${input.privateMode ? 'Private' : 'Normal'}. Language: ${input.languageCode}`;
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    // Calling internal secure API route
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:9002';
+    const response = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://dukaansaathi-ai-syed-gulam-ahmeds-projects.vercel.app',
-        'X-Title': 'DukaanSaathi AI'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt, userMessage })
     });
 
     const data = await response.json();
@@ -70,7 +57,7 @@ IMPORTANT: Respond ONLY with a valid JSON object matching the requested schema. 
     const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleanContent);
   } catch (error) {
-    console.error('AI Processing Error:', error);
+    console.error('Voice AI Error:', error);
     return {
       spokenResponse: input.languageCode === 'hi-IN' ? "माफ कीजिये, कुछ गड़बड़ हो गई।" : "Sorry, something went wrong.",
       lessonText: "AI connection issue.",

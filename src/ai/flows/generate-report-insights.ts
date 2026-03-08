@@ -26,33 +26,23 @@ const ReportInsightsOutputSchema = z.object({
 export type ReportInsightsOutput = z.infer<typeof ReportInsightsOutputSchema>;
 
 export async function generateReportInsights(input: ReportInsightsInput): Promise<ReportInsightsOutput> {
-  const systemPrompt = `You are DukaanSaathi AI. Analyze the provided sales data and generate insights.
-1. Customer Patterns: Recurring behaviors.
-2. Sales Patterns: Trends and peak times.
-3. Weekly Tip: Actionable advice.
-4. lessonText: 2-sentence business insight.
+  const systemPrompt = `Analyze sales data and return: 
+1. Customer Patterns
+2. Sales Patterns
+3. Weekly Tip
+4. lessonText
 
-PRIVACY: NEVER mention profit margins.
-Respond ONLY with a valid JSON object.`;
+PRIVACY: NEVER mention exact revenue/profit margins. 
+Language: ${input.language}. Respond ONLY with JSON.`;
 
-  const userMessage = `Sales Data: ${JSON.stringify(input.salesData)}. Language: ${input.language}`;
+  const userMessage = `Sales Data: ${JSON.stringify(input.salesData)}`;
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:9002';
+    const response = await fetch(`${baseUrl}/api/chat`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://dukaansaathi-ai-syed-gulam-ahmeds-projects.vercel.app',
-        'X-Title': 'DukaanSaathi AI'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-exp:free',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ]
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ systemPrompt, userMessage })
     });
 
     const data = await response.json();
@@ -61,10 +51,10 @@ Respond ONLY with a valid JSON object.`;
   } catch (error) {
     console.error('Report AI Error:', error);
     return {
-      customerPatterns: "Data unavailable",
-      salesPatterns: "Data unavailable",
-      weeklyTip: "Keep selling!",
-      lessonText: "AI connection error."
+      customerPatterns: "Data processing unavailable",
+      salesPatterns: "Data processing unavailable",
+      weeklyTip: "Continue tracking your sales for better insights.",
+      lessonText: "Connection error."
     };
   }
 }
