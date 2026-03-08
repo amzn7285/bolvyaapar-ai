@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -38,7 +37,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     }
 
     setCurrentLesson(lesson);
-    // Wait 3 seconds of inactivity before showing the card
     setTimeout(() => {
       setShowLessonCard(true);
     }, 3000);
@@ -86,10 +84,9 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       {/* Header */}
-      <header className="bg-[#0D2240] px-4 py-3 flex items-center justify-between shadow-lg z-20 h-20">
+      <header className="bg-[#0D2240] px-4 py-3 flex items-center justify-between shadow-lg z-20 h-20 shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-2xl font-black text-white">दुकान साथी AI 🇮🇳</span>
-          <span className="text-2xl">{language === 'hi-IN' ? '🇮🇳' : '🇬🇧'}</span>
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -117,15 +114,15 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       </header>
 
       {privateMode && (
-        <div className="bg-accent/20 border-b border-accent/30 py-3 px-4 text-center">
+        <div className="bg-accent/20 border-b border-accent/30 py-3 px-4 text-center shrink-0">
           <p className="text-accent-foreground text-sm font-bold uppercase tracking-wider">
             {texts.privateModeOn}
           </p>
         </div>
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pb-48">
+      {/* Main Content - Generous padding bottom to clear floating buttons */}
+      <main className="flex-1 overflow-y-auto pb-[420px]">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
           <TabsContent value="dukaan" className="m-0 p-4 animate-in fade-in slide-in-from-right-4">
             <DukaanTab privateMode={privateMode} language={language} onTransaction={handleTransaction} />
@@ -141,7 +138,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
 
       {/* Passive Lesson Card */}
       {showLessonCard && !privateMode && !showCustomerView && currentLesson && (
-        <div className="fixed bottom-40 left-4 right-4 bg-card border-4 border-primary/30 rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom-full duration-500 z-[60] flex items-center gap-8">
+        <div className="fixed bottom-[240px] left-4 right-4 bg-card border-4 border-primary/30 rounded-[2.5rem] p-8 shadow-2xl animate-in slide-in-from-bottom-full duration-500 z-[60] flex items-center gap-8">
           <div className="text-8xl select-none">📚</div>
           <div className="flex-1 space-y-4">
             <p className="text-sm font-bold text-primary uppercase tracking-widest">
@@ -170,18 +167,20 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
         </div>
       )}
 
-      {/* Voice Button - Fixed Center */}
-      <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-50">
-        <VoiceButton 
-          language={language} 
-          privateMode={privateMode} 
-          onTransactionSuccess={handleTransaction} 
-          onLessonGenerated={handleLessonGenerated}
-        />
+      {/* Voice Button Area - Fixed above Tab Navigation */}
+      <div className="fixed bottom-32 left-0 right-0 z-50 flex justify-center pointer-events-none">
+        <div className="pointer-events-auto">
+          <VoiceButton 
+            language={language} 
+            privateMode={privateMode} 
+            onTransactionSuccess={handleTransaction} 
+            onLessonGenerated={handleLessonGenerated}
+          />
+        </div>
       </div>
 
       {/* Tab Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t-2 border-border px-8 py-6 flex justify-between items-center z-40 pb-safe shadow-[0_-4px_30px_-5px_rgba(0,0,0,0.5)] h-28">
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t-2 border-border px-8 py-6 flex justify-between items-center z-40 pb-safe shadow-[0_-4px_30px_-5px_rgba(0,0,0,0.5)] h-28 shrink-0">
         <button 
           onClick={() => setActiveTab("dukaan")}
           className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dukaan' ? 'text-primary scale-110' : 'text-muted-foreground'}`}
