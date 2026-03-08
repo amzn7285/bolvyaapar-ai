@@ -18,6 +18,7 @@ export default function VoiceButton({ language, privateMode, onTransactionSucces
   const [isProcessing, setIsProcessing] = useState(false);
   const [browserSupported, setBrowserSupported] = useState(true);
   const recognitionRef = useRef<any>(null);
+  const audioUnlocked = useRef(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -28,50 +29,68 @@ export default function VoiceButton({ language, privateMode, onTransactionSucces
         return;
       }
 
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = language;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = language;
 
-      recognitionRef.current.onresult = async (event: any) => {
+      recognition.onresult = async (event: any) => {
         const transcript = event.results[0][0].transcript;
         processQuery(transcript);
       };
 
-      recognitionRef.current.onerror = (event: any) => {
+      recognition.onerror = (event: any) => {
         console.error("Speech Recognition Error:", event.error);
         setIsListening(false);
       };
 
-      recognitionRef.current.onend = () => {
+      recognition.onend = () => {
         setIsListening(false);
       };
+
+      recognitionRef.current = recognition;
     }
   }, [language]);
 
   const speak = (text: string) => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    
+    // Stop any current speech
     window.speechSynthesis.cancel();
+    
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = language;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
+    
+    // On some mobile browsers, we need to speak a silent utterance first to unlock audio context
     window.speechSynthesis.speak(utterance);
+  };
+
+  const unlockAudio = () => {
+    if (audioUnlocked.current) return;
+    // Play a silent utterance to "unlock" speech synthesis on mobile/safari
+    const silent = new SpeechSynthesisUtterance("");
+    window.speechSynthesis.speak(silent);
+    audioUnlocked.current = true;
   };
 
   const startListening = () => {
     if (!browserSupported || isListening || isProcessing) return;
 
-    // IMPORTANT: Warm up the speech synthesis engine on user interaction.
-    // This "unlocks" audio for the delayed AI response.
-    const warmup = new SpeechSynthesisUtterance("");
-    window.speechSynthesis.speak(warmup);
-
-    setIsListening(true);
+    // Direct user gesture: Unlock audio and start recognition
+    unlockAudio();
+    
+    // Immediate verbal cue
     speak(language === 'hi-IN' ? "बोलिए" : "Go ahead");
     
+    setIsListening(true);
+    
     try {
-      recognitionRef.current?.start();
+      if (recognitionRef.current) {
+        recognitionRef.current.lang = language;
+        recognitionRef.current.start();
+      }
     } catch (err) {
       console.error("Failed to start recognition:", err);
       setIsListening(false);
@@ -88,7 +107,7 @@ export default function VoiceButton({ language, privateMode, onTransactionSucces
       });
 
       if (result) {
-        // Auto-play the confirmation response
+        // Automatically speak the response as soon as it appears
         speak(result.spokenResponse);
         onTransactionSuccess(result.transactionDetails);
         onLessonGenerated(result.lessonText);
@@ -133,8 +152,8 @@ export default function VoiceButton({ language, privateMode, onTransactionSucces
           <span className="absolute inset-0 bg-white/20 animate-ping rounded-full pointer-events-none" />
         )}
       </button>
-      <p className="text-sm font-bold text-muted-foreground uppercase tracking-tighter opacity-60">
-        {isListening ? (language === 'hi-IN' ? 'सुन रहा हूँ...' : 'Listening...') : (language === 'hi-IN' ? 'टैप करके बोलें' : 'Tap to speak')}
+      <p className="text-4xl font-black text-muted-foreground uppercase tracking-tighter opacity-60">
+        {isListening ? (language === 'hi-IN' ? 'सुन रहा हूँ...' : 'Listening...') : (language === 'hi-IN' ? 'टैप करें' : 'Tap')}
       </p>
     </div>
   );
