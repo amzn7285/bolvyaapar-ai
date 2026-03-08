@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { Volume2, Eye, EyeOff } from "lucide-react";
+import { Volume2, Eye } from "lucide-react";
 
 interface DukaanTabProps {
   privateMode: boolean;
@@ -77,12 +77,15 @@ export default function DukaanTab({ privateMode, language }: DukaanTabProps) {
   return (
     <div className="space-y-6">
       {lowStockCount > 0 && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-3 flex items-center justify-between animate-pulse">
-          <p className="text-destructive font-bold text-sm">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center justify-between animate-pulse">
+          <p className="text-destructive font-bold text-lg">
             ⚠️ {lowStockCount} {texts.itemsLow}
           </p>
-          <button onClick={() => speakStock(stock.find(s => s.level < 30))} className="text-destructive">
-            <Volume2 size={20} />
+          <button 
+            onClick={() => speakStock(stock.find(s => s.level < 30))} 
+            className="h-16 w-16 flex items-center justify-center text-destructive bg-destructive/10 rounded-full"
+          >
+            <Volume2 size={32} />
           </button>
         </div>
       )}
@@ -94,12 +97,12 @@ export default function DukaanTab({ privateMode, language }: DukaanTabProps) {
             {texts.todaySales}
           </p>
           <div className="flex items-baseline gap-2 mb-4">
-            <span className="text-xl font-bold text-primary">₹</span>
-            <span className={cn("text-5xl font-bold tracking-tighter transition-all duration-300", privateMode && "blur-xl")}>
+            <span className="text-4xl font-bold text-primary">₹</span>
+            <span className={cn("text-6xl font-black tracking-tighter transition-all duration-300", privateMode && "blur-xl")}>
               {salesData.total.toLocaleString()}
             </span>
           </div>
-          <p className="text-secondary font-medium">
+          <p className="text-secondary font-bold text-xl">
             {salesData.count} {texts.transactions}
           </p>
         </CardContent>
@@ -113,26 +116,26 @@ export default function DukaanTab({ privateMode, language }: DukaanTabProps) {
         <div className="grid grid-cols-1 gap-4">
           {stock.map((item) => (
             <Card key={item.id} className="bg-card border-border overflow-hidden rounded-2xl">
-              <CardContent className="p-5">
+              <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex gap-4 items-center">
-                    <span className="text-5xl">{item.emoji}</span>
+                    <span className="text-6xl">{item.emoji}</span>
                     <div>
                       <h3 className="text-muted-foreground text-xs uppercase font-bold">{item.name}</h3>
-                      <p className="text-3xl font-bold">{item.qty}<span className="text-lg ml-1 font-normal opacity-60">{item.unit}</span></p>
+                      <p className="text-4xl font-black">{item.qty}<span className="text-xl ml-1 font-normal opacity-60">{item.unit}</span></p>
                     </div>
                   </div>
                   <button 
                     onClick={() => speakStock(item)}
-                    className="p-4 bg-secondary/10 rounded-full text-secondary hover:bg-secondary/20 active:scale-90 transition-all"
+                    className="h-16 w-16 flex items-center justify-center bg-secondary/10 rounded-full text-secondary hover:bg-secondary/20 active:scale-90 transition-all"
                   >
-                    <Volume2 size={24} />
+                    <Volume2 size={32} />
                   </button>
                 </div>
                 <div className="space-y-2">
                   <Progress 
                     value={item.level} 
-                    className="h-3"
+                    className="h-4"
                     indicatorClassName={cn(
                       item.level < 15 ? "bg-destructive" : item.level < 30 ? "bg-yellow-500" : "bg-secondary"
                     )}
@@ -163,25 +166,26 @@ export default function DukaanTab({ privateMode, language }: DukaanTabProps) {
             <div 
               key={sale.id} 
               onClick={() => toggleSaleReveal(sale.id)}
-              className="bg-card/30 border border-border p-4 rounded-2xl flex items-center justify-between active:bg-card/50 transition-all cursor-pointer group"
+              className="bg-card/30 border border-border p-6 rounded-2xl flex items-center justify-between active:bg-card/50 transition-all cursor-pointer group"
             >
-              <div className="flex gap-4">
-                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-2xl group-active:scale-95 transition-transform">
+              <div className="flex gap-4 items-center">
+                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center text-4xl group-active:scale-95 transition-transform">
                   {sale.item.includes('आटा') || sale.item === 'Aata' ? '🌾' : sale.item.includes('दूध') || sale.item === 'Milk' ? '🥛' : '🧼'}
                 </div>
                 <div>
-                  <h4 className="font-bold text-lg">{sale.item}</h4>
-                  <p className="text-xs text-muted-foreground">{sale.qty} • {sale.customer} • {sale.time}</p>
+                  <h4 className="font-bold text-xl">{sale.item}</h4>
+                  <p className="text-sm text-muted-foreground font-bold">{sale.qty} • {sale.customer}</p>
+                  <p className="text-xs text-muted-foreground/60">{sale.time}</p>
                 </div>
               </div>
               <div className="flex flex-col items-end">
                 {revealedSales.has(sale.id) ? (
-                  <span className="text-2xl font-bold text-primary animate-in zoom-in-95 duration-200">
+                  <span className="text-4xl font-black text-primary animate-in zoom-in-95 duration-200">
                     ₹{sale.amount}
                   </span>
                 ) : (
-                  <div className="flex items-center gap-1 py-2 px-3 bg-primary/10 rounded-full text-[10px] font-bold uppercase tracking-wider text-primary group-hover:bg-primary/20 transition-colors">
-                    <Eye size={14} /> {texts.reveal}
+                  <div className="flex items-center gap-2 h-16 px-6 bg-primary/10 rounded-2xl text-sm font-bold uppercase tracking-wider text-primary group-hover:bg-primary/20 transition-colors">
+                    <Eye size={20} /> {texts.reveal}
                   </div>
                 )}
               </div>

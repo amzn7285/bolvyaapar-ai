@@ -65,7 +65,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       {/* Header */}
       <header className="bg-[#0D2240] px-4 py-3 flex items-center justify-between shadow-lg z-20">
         <div className="flex items-center gap-2">
-          <span className="text-xl font-bold text-white">दुकान साथी AI</span>
+          <span className="text-xl font-bold text-white">दुकान साथी AI 🇮🇳</span>
           <span className="text-lg">{language === 'hi-IN' ? '🇮🇳' : '🇬🇧'}</span>
         </div>
         <div className="flex items-center gap-3">
@@ -74,27 +74,27 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
               setPrivateMode(!privateMode);
               if (!privateMode) setShowLessonCard(false); // Hide lesson card when entering private mode
             }}
-            className={`p-3 rounded-full transition-all ${privateMode ? 'bg-accent text-white' : 'bg-card/50 text-muted-foreground'}`}
+            className={`h-16 w-16 flex items-center justify-center rounded-full transition-all ${privateMode ? 'bg-accent text-white' : 'bg-card/50 text-muted-foreground'}`}
           >
-            {privateMode ? <EyeOff size={24} /> : <Eye size={24} />}
+            {privateMode ? <EyeOff size={28} /> : <Eye size={28} />}
           </button>
           <button 
             onClick={() => setShowCustomerView(true)}
-            className="p-3 rounded-full bg-card/50 text-muted-foreground hover:bg-secondary transition-all"
+            className="h-16 w-16 flex items-center justify-center rounded-full bg-card/50 text-muted-foreground hover:bg-secondary transition-all"
           >
-            <Users size={24} />
+            <Users size={28} />
           </button>
           <button 
             onClick={onLogout}
-            className="p-3 rounded-full bg-card/50 text-muted-foreground hover:bg-destructive transition-all"
+            className="h-16 w-16 flex items-center justify-center rounded-full bg-card/50 text-muted-foreground hover:bg-destructive transition-all"
           >
-            <Lock size={24} />
+            <Lock size={28} />
           </button>
         </div>
       </header>
 
       {privateMode && (
-        <div className="bg-accent/20 border-b border-accent/30 py-1 px-4 text-center">
+        <div className="bg-accent/20 border-b border-accent/30 py-2 px-4 text-center">
           <p className="text-accent-foreground text-xs font-bold uppercase tracking-wider">
             {language === 'hi-IN' ? 'प्राइवेट मोड चालू - नंबर छिपे हुए हैं' : 'Private Mode ON — Numbers hidden'}
           </p>
@@ -102,7 +102,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       )}
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto pb-32">
+      <main className="flex-1 overflow-y-auto pb-40">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
           <TabsContent value="dukaan" className="m-0 p-4 animate-in fade-in slide-in-from-right-4">
             <DukaanTab privateMode={privateMode} language={language} onTransaction={handleTransaction} />
@@ -127,14 +127,14 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
             <div className="flex gap-3">
               <button 
                 onClick={() => speakLesson(currentLesson)}
-                className="bg-secondary text-white px-6 py-4 rounded-2xl flex items-center gap-2 font-bold active:scale-95 transition-all text-lg flex-1 justify-center"
+                className="bg-secondary text-white h-16 px-6 rounded-2xl flex items-center gap-2 font-bold active:scale-95 transition-all text-lg flex-1 justify-center"
               >
                 <Volume2 size={24} />
                 {language === 'hi-IN' ? 'सुनो' : 'Listen'}
               </button>
               <button 
                 onClick={handleDismissLesson}
-                className="bg-muted text-muted-foreground px-6 py-4 rounded-2xl flex items-center gap-2 font-bold active:scale-95 transition-all text-lg flex-1 justify-center"
+                className="bg-muted text-muted-foreground h-16 px-6 rounded-2xl flex items-center gap-2 font-bold active:scale-95 transition-all text-lg flex-1 justify-center"
               >
                 <X size={24} />
                 {language === 'hi-IN' ? 'बाद में' : 'Later'}
@@ -145,7 +145,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       )}
 
       {/* Voice Button - Fixed Center */}
-      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+      <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50">
         <VoiceButton 
           language={language} 
           privateMode={privateMode} 
@@ -155,29 +155,29 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       </div>
 
       {/* Tab Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border px-6 py-2 flex justify-between items-center z-40 pb-safe">
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border px-6 py-4 flex justify-between items-center z-40 pb-safe shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.3)]">
         <button 
           onClick={() => setActiveTab("dukaan")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dukaan' ? 'text-primary' : 'text-muted-foreground'}`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dukaan' ? 'text-primary scale-110' : 'text-muted-foreground'}`}
         >
-          <Home size={activeTab === 'dukaan' ? 28 : 24} />
+          <Home size={32} />
           <span className="text-[10px] font-bold uppercase">{language === 'hi-IN' ? 'दुकान' : 'Dukaan'}</span>
         </button>
         
         <button 
           onClick={() => setActiveTab("seekha")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'seekha' ? 'text-primary' : 'text-muted-foreground'}`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'seekha' ? 'text-primary scale-110' : 'text-muted-foreground'}`}
         >
-          <BookOpen size={activeTab === 'seekha' ? 28 : 24} />
-          <span className="text-[10px] font-bold uppercase">{language === 'hi-IN' ? '📚 सीखा' : '📚 Seekha'}</span>
+          <BookOpen size={32} />
+          <span className="text-[10px] font-bold uppercase">{language === 'hi-IN' ? 'सीखा' : 'Seekha'}</span>
         </button>
 
         <button 
           onClick={() => setActiveTab("report")}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'report' ? 'text-primary' : 'text-muted-foreground'}`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'report' ? 'text-primary scale-110' : 'text-muted-foreground'}`}
           disabled={role === 'helper'}
         >
-          <BarChart3 size={activeTab === 'report' ? 28 : 24} className={role === 'helper' ? 'opacity-30' : ''} />
+          <BarChart3 size={32} className={role === 'helper' ? 'opacity-30' : ''} />
           <span className={`text-[10px] font-bold uppercase ${role === 'helper' ? 'opacity-30' : ''}`}>
             {language === 'hi-IN' ? 'रिपोर्ट' : 'Report'}
           </span>
