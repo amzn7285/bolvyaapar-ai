@@ -89,7 +89,6 @@ export default function ReportTab({ language, privateMode }: ReportTabProps) {
   };
 
   const handleWhatsAppSummary = () => {
-    // Rupee-free summary: only trends, products, and tips
     const summary = `${language === 'hi-IN' ? 'व्यापार अपडेट' : 'Business Update'}: 
 ${texts.bestProduct}: ${reports.bestProduct}
 ${texts.customerPattern}: ${reports.customerPattern}
@@ -255,17 +254,6 @@ ${texts.tip}: ${reports.tip}`;
           <Download size={28} />
           {texts.export}
         </button>
-      </div>
-
-      <div className="p-8 bg-muted/30 rounded-[2rem] border border-border space-y-4">
-        <h4 className="text-[10px] font-bold uppercase text-muted-foreground">{texts.privacy}</h4>
-        <ul className="space-y-3">
-          {['PIN Protection', 'Helper Mode Restricted', 'Auto-Blur Numbers', 'Local PIN Hashing'].map((f) => (
-            <li key={f} className="flex items-center gap-3 text-lg text-muted-foreground font-bold">
-              <Check size={20} className="text-secondary" /> {f}
-            </li>
-          ))}
-        </ul>
       </div>
     </div>
   );

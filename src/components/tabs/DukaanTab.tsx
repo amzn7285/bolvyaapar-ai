@@ -77,15 +77,15 @@ export default function DukaanTab({ privateMode, language }: DukaanTabProps) {
   return (
     <div className="space-y-6">
       {lowStockCount > 0 && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center justify-between animate-pulse">
+        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex items-center justify-between animate-pulse min-h-[64px]">
           <p className="text-destructive font-bold text-2xl">
             ⚠️ {lowStockCount} {texts.itemsLow}
           </p>
           <button 
             onClick={() => speakStock(stock.find(s => s.level < 30))} 
-            className="h-20 w-20 flex items-center justify-center text-destructive bg-destructive/10 rounded-full"
+            className="h-16 w-16 flex items-center justify-center text-destructive bg-destructive/10 rounded-full"
           >
-            <Volume2 size={40} />
+            <Volume2 size={32} />
           </button>
         </div>
       )}
@@ -127,9 +127,9 @@ export default function DukaanTab({ privateMode, language }: DukaanTabProps) {
                   </div>
                   <button 
                     onClick={() => speakStock(item)}
-                    className="h-20 w-20 flex items-center justify-center bg-secondary/10 rounded-full text-secondary hover:bg-secondary/20 active:scale-90 transition-all"
+                    className="h-16 w-16 flex items-center justify-center bg-secondary/10 rounded-full text-secondary hover:bg-secondary/20 active:scale-90 transition-all"
                   >
-                    <Volume2 size={40} />
+                    <Volume2 size={32} />
                   </button>
                 </div>
                 <div className="space-y-2">
