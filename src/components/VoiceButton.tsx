@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Mic, Check, Loader2, BookOpen } from "lucide-react";
+import { Mic, Loader2, BookOpen } from "lucide-react";
 import { processVoiceSaleTransaction } from "@/ai/flows/process-voice-sale-transaction";
 import { cn } from "@/lib/utils";
 
@@ -37,11 +38,10 @@ export default function VoiceButton({ language, privateMode, onTransactionSucces
   }, [language]);
 
   const speak = (text: string) => {
-    if (privateMode) return; // Numbers silenced in private mode handled by AI prompt but adding extra layer
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = language;
-    utterance.rate = 0.9;
+    utterance.rate = 1.0;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -67,7 +67,6 @@ export default function VoiceButton({ language, privateMode, onTransactionSucces
         onTransactionSuccess(result.transactionDetails);
         setLessonContent(result.lessonText);
         
-        // Passive lesson button appears after delay
         setTimeout(() => {
           setShowLesson(true);
         }, 3000);
@@ -81,10 +80,7 @@ export default function VoiceButton({ language, privateMode, onTransactionSucces
   };
 
   const handleLessonTap = () => {
-    // Show lesson visual modal/card
-    // In this app, the prompt says "tap to show lesson card visually (never auto-spoken)"
-    // but the card has a "Suno" button.
-    alert(lessonContent); // Simple for now, can be a styled dialog
+    alert(lessonContent);
   };
 
   return (
@@ -109,8 +105,6 @@ export default function VoiceButton({ language, privateMode, onTransactionSucces
       >
         {isProcessing ? (
           <Loader2 className="w-10 h-10 text-white animate-spin" />
-        ) : isListening ? (
-          <Mic className="w-10 h-10 text-white" />
         ) : (
           <Mic className="w-10 h-10 text-white" />
         )}
