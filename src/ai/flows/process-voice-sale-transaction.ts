@@ -1,4 +1,3 @@
-
 'use server';
 
 import { z } from 'zod';
@@ -24,32 +23,31 @@ const ProcessVoiceSaleTransactionOutputSchema = z.object({
 export type ProcessVoiceSaleTransactionOutput = z.infer<typeof ProcessVoiceSaleTransactionOutputSchema>;
 
 export async function processVoiceSaleTransaction(input: ProcessVoiceSaleTransactionInput): Promise<ProcessVoiceSaleTransactionOutput> {
-  const systemPrompt = `You are DukaanSaathi AI — a voice-first business partner for Indian kirana shopkeepers.
-
-JOB 1 — Complete the task:
-- Parse user input (informal Hindi/English).
-- Extract product, quantity, unit, customer, and price into 'transactionDetails'.
-- Confirm in 1-2 short sentences for 'spokenResponse'.
-
-JOB 2 — Prepare lesson:
-- Set 'lessonText' with a 2-sentence business insight.
-
-PRIVACY:
-1. NEVER speak profit/revenue aloud.
-2. If privateMode (${input.privateMode}) is true, OMIT all prices from 'spokenResponse'.
-3. End with 'Koi aur kaam?' (Hindi) or 'Anything else?' (English).
-
-Respond ONLY with valid JSON.`;
+  const systemPrompt = `You are DukaanSaathi AI. Task: Parse voice input.
+1. 'spokenResponse': 1-2 warm sentences confirmation.
+2. 'lessonText': 2-sentence business insight.
+3. 'transactionDetails': Extracted data.
+PRIVACY: NEVER mention exact revenue aloud.
+Respond ONLY with JSON.`;
 
   const userMessage = `User: "${input.userQuery}". Mode: ${input.privateMode ? 'Private' : 'Normal'}. Language: ${input.languageCode}`;
 
   try {
-    // Calling internal secure API route
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:9002';
-    const response = await fetch(`${baseUrl}/api/chat`, {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ systemPrompt, userMessage })
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://dukaansaathi-ai-syed-gulam-ahmeds-projects.vercel.app',
+        'X-Title': 'DukaanSaathi AI'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-exp:free',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage }
+        ]
+      })
     });
 
     const data = await response.json();
@@ -57,10 +55,10 @@ Respond ONLY with valid JSON.`;
     const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleanContent);
   } catch (error) {
-    console.error('Voice AI Error:', error);
+    console.error('Flow AI Error:', error);
     return {
-      spokenResponse: input.languageCode === 'hi-IN' ? "माफ कीजिये, कुछ गड़बड़ हो गई।" : "Sorry, something went wrong.",
-      lessonText: "AI connection issue.",
+      spokenResponse: "माफ कीजिये, कुछ गड़बड़ हो गई।",
+      lessonText: "Connection error.",
       transactionDetails: {}
     };
   }

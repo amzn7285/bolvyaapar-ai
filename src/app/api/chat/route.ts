@@ -1,9 +1,13 @@
+import { NextRequest, NextResponse } from 'next/server'
 
-import { NextResponse } from 'next/server';
-
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { systemPrompt, userMessage } = await req.json();
+    const { userMessage, systemPrompt } = await req.json()
+
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error("OPENROUTER_API_KEY is not defined in environment variables.");
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    }
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -23,15 +27,15 @@ export async function POST(req: Request) {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenRouter API Error:', errorData);
-      return NextResponse.json({ error: 'AI Service Error' }, { status: response.status });
+      const errorText = await response.text();
+      console.error("OpenRouter API Error:", errorText);
+      return NextResponse.json({ error: 'AI call failed', details: errorText }, { status: response.status });
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
     console.error('Internal API Route Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
