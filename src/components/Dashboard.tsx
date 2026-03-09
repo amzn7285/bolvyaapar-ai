@@ -298,8 +298,8 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const bizInfo = BUSINESS_TYPES.find(b => b.id === profile?.businessType) || BUSINESS_TYPES[0];
 
   const texts = {
-    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", khata: "खाता", report: "रिपोर्ट", activity: bizInfo.isService ? "ऑर्डर" : "हिसाब", share: "WhatsApp पर भेजें" },
-    "en-IN": { dukaan: "Dukaan", stock: "Stock", khata: "Khata", report: "Report", activity: bizInfo.isService ? "Orders" : "History", share: "Share on WhatsApp" }
+    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", khata: "खाता", report: "रिपोर्ट", activity: bizInfo.isService ? "ऑर्डर" : "हिसाब", share: "WhatsApp पर भेजें", tagline: "बोलकर चलाओ AI से कारोबार" },
+    "en-IN": { dukaan: "Dukaan", stock: "Stock", khata: "Khata", report: "Report", activity: bizInfo.isService ? "Orders" : "History", share: "Share on WhatsApp", tagline: "Bolkar Chalao AI Se Karobaar" }
   }[language];
 
   return (
@@ -318,6 +318,9 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
           <h1 className="text-xl font-black text-white tracking-tight truncate max-w-[180px]">
             {profile?.shopName || 'BolVyapar Shop'}
           </h1>
+          <p className="text-[10px] text-[#FFB300] font-bold italic tracking-tight mb-0.5">
+            {texts.tagline}
+          </p>
           <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest flex items-center gap-1">
             {bizInfo.emoji} {language === 'hi-IN' ? bizInfo.hi : bizInfo.en}
           </p>

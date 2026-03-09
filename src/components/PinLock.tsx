@@ -41,13 +41,13 @@ export default function PinLock({ onAuth, language, onLanguageChange }: PinLockP
 
   const texts = {
     "hi-IN": {
-      tagline: "बोलिये… बाकी सब BolVyapar संभालेगा",
+      tagline: "बोलकर चलाओ AI से कारोबार",
       select: "भाषा चुनें",
       enter: "PIN दर्ज करें",
       error: "गलत PIN",
     },
     "en-IN": {
-      tagline: "Boliye… Baaki Sab BolVyapar Sambhalega",
+      tagline: "Bolkar Chalao AI Se Karobaar",
       select: "Select Language",
       enter: "Enter PIN",
       error: "Wrong PIN",
@@ -94,7 +94,7 @@ export default function PinLock({ onAuth, language, onLanguageChange }: PinLockP
         </div>
       </div>
 
-      <div className="w-full max-w-xs space-y-12 mb-8">
+      <div className="w-full max-xs space-y-12 mb-8">
         <div className="flex flex-col items-center gap-6">
           <div className="flex gap-5">
             {[0, 1, 2, 3].map((i) => (

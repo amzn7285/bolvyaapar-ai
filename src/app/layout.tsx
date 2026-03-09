@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'BolVyapar AI (बोल व्यापार)',
-  description: 'Boliye… Baaki Sab BolVyapar Sambhalega. Your voice-first AI business partner.',
+  description: 'बोलकर चलाओ AI से कारोबार — Bolkar Chalao AI Se Karobaar. Your voice-first AI business partner.',
 };
 
 export default function RootLayout({
