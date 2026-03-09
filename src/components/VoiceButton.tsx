@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -84,14 +83,14 @@ Intents:
 2. expense (Business kharcha)
 3. credit (Udhaar dena)
 4. payment (Udhaar vapas lena)
-5. job_create (Service job: tailor/repair/etc - e.g. 'Rahul ka mobile liya screen todda hai 500 mein dunga')
+5. job_create (Service job: tailor/repair/etc - e.g. 'Sunita ne 500 advance diya suit ke liye total 1300'. Extract total amount as price and the partial as advance)
 6. job_complete (Mark job ready - e.g. 'Rahul ka kaam ho gaya')
 
 Context: ${businessType}. Stock: ${stockCategories}. Khata: ${khataNames}. 
-For job_create: extract customerName, productName (item being serviced), description (problem), price (total), advance.
+For job_create: extract customerName, productName (item being serviced), description (problem), price (TOTAL price), advance (partial paid), dueDate.
 For job_complete: extract customerName.
 
-Return ONLY JSON: {"intent": "...", "spokenResponse": "...", "productName": "...", "customerName": "...", "price": 0, "quantity": 0, "unit": "...", "description": "..."}`;
+Return ONLY JSON: {"intent": "...", "spokenResponse": "...", "productName": "...", "customerName": "...", "price": 0, "quantity": 0, "unit": "...", "description": "...", "advance": 0}`;
 
       const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userMessage: query, systemPrompt }) });
       const data = await response.json();
@@ -110,7 +109,6 @@ Return ONLY JSON: {"intent": "...", "spokenResponse": "...", "productName": "...
       return;
     }
     
-    // Fuzzy matching learning logic for retail sales
     if (txn.intent === 'sale') {
       const mapping = learnedMappings[txn.productName?.toLowerCase()];
       if (mapping?.count >= 3) {
@@ -165,6 +163,7 @@ Return ONLY JSON: {"intent": "...", "spokenResponse": "...", "productName": "...
   if (pendingTxn && !isAskingClarification) {
     const isJob = pendingTxn.intent === 'job_create';
     const isJobComplete = pendingTxn.intent === 'job_complete';
+    const isAdvance = (pendingTxn.advance || 0) > 0;
     
     return (
       <div className="fixed inset-0 z-[150] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
@@ -176,7 +175,7 @@ Return ONLY JSON: {"intent": "...", "spokenResponse": "...", "productName": "...
               </div>
               <div>
                 <h2 className="text-3xl font-black text-[#0D2240] uppercase tracking-tight">
-                  {isJobComplete ? pendingTxn.customerName : pendingTxn.productName || pendingTxn.customerName}
+                  {isJobComplete ? pendingTxn.customerName : (pendingTxn.productName || pendingTxn.customerName)}
                 </h2>
                 <p className="text-xl font-black text-slate-400 mt-2">
                   {isJobComplete ? (language === 'hi-IN' ? 'काम हो गया' : 'Ready') : 
@@ -185,8 +184,23 @@ Return ONLY JSON: {"intent": "...", "spokenResponse": "...", "productName": "...
                 </p>
               </div>
             </div>
-            {!isHelper && !isJobComplete && pendingTxn.price > 0 && (
-              <div className="text-5xl font-black text-secondary text-center">₹{pendingTxn.price}</div>
+            {!isHelper && !isJobComplete && (pendingTxn.price > 0 || isAdvance) && (
+              <div className="space-y-2 text-center">
+                {isJob && isAdvance && (
+                  <p className="text-emerald-600 font-bold uppercase text-[10px] tracking-widest">
+                    Advance: ₹{pendingTxn.advance}
+                  </p>
+                )}
+                <div className="text-5xl font-black text-secondary">
+                  ₹{isJob ? (pendingTxn.price - (pendingTxn.advance || 0)) : pendingTxn.price}
+                  {isJob && <span className="text-sm ml-2 text-slate-400 uppercase">Balance</span>}
+                </div>
+                {isJob && (
+                  <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-1">
+                    Total: ₹{pendingTxn.price}
+                  </p>
+                )}
+              </div>
             )}
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => setPendingTxn(null)} className="h-20 rounded-[28px] bg-red-50 text-red-600 font-black text-lg uppercase border-2 border-red-100 flex flex-col items-center justify-center">

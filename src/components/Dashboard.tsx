@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -96,22 +95,46 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       return;
     }
 
-    // Handle New Job Creation
+    // Handle New Job Creation with Advance
     if (details.intent === 'job_create') {
+      const total = details.price || 0;
+      const advance = details.advance || 0;
+      const balance = Math.max(0, total - advance);
+
       const newJob = {
         id: Date.now(),
         timestamp,
         customerName: details.customerName,
         item: details.productName,
         problem: details.description || details.productName,
-        price: details.price || 0,
-        advance: details.advance || 0,
+        price: total,
+        advance: advance,
         status: 'Received',
         dueDate: details.dueDate || null
       };
       const updatedJobs = [newJob, ...jobs];
       setJobs(updatedJobs);
       localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updatedJobs));
+
+      // Also create/update Khata entry for the balance
+      if (balance > 0 || advance > 0) {
+        let exists = false;
+        const updatedKhata = creditKhata.map(c => {
+          if (c.name.toLowerCase() === details.customerName?.toLowerCase()) {
+            exists = true;
+            const entry = { id: Date.now(), timestamp, type: 'advance_job', amount: balance, note: `Job: ${details.productName} (Total: ${total}, Adv: ${advance})` };
+            return { ...c, balance: (c.balance || 0) + balance, history: [entry, ...(c.history || [])], isService: true };
+          }
+          return c;
+        });
+
+        if (!exists) {
+          const entry = { id: Date.now(), timestamp, type: 'advance_job', amount: balance, note: `Job: ${details.productName} (Total: ${total}, Adv: ${advance})` };
+          updatedKhata.unshift({ id: Date.now(), name: details.customerName, phone: "", balance: balance, history: [entry], isService: true });
+        }
+        setCreditKhata(updatedKhata);
+        localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(updatedKhata));
+      }
       return;
     }
 
@@ -123,19 +146,25 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       return;
     }
 
-    if (details.isCredit) {
+    if (details.isCredit || details.intent === 'credit') {
+      let exists = false;
       const updatedKhata = creditKhata.map(c => {
         if (c.name.toLowerCase() === details.customerName?.toLowerCase()) {
+          exists = true;
           const entry = { id: Date.now(), timestamp, type: 'credit', amount: details.price || 0, note: details.productName || (language === 'hi-IN' ? 'उधार' : 'Credit') };
           return { ...c, balance: (c.balance || 0) + (details.price || 0), history: [entry, ...(c.history || [])] };
         }
         return c;
       });
+      if (!exists) {
+        const entry = { id: Date.now(), timestamp, type: 'credit', amount: details.price || 0, note: details.productName || (language === 'hi-IN' ? 'उधार' : 'Credit') };
+        updatedKhata.unshift({ id: Date.now(), name: details.customerName, phone: "", balance: details.price || 0, history: [entry] });
+      }
       setCreditKhata(updatedKhata);
       localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(updatedKhata));
     }
 
-    if (details.isPayment) {
+    if (details.isPayment || details.intent === 'payment') {
       const updatedKhata = creditKhata.map(c => {
         if (c.name.toLowerCase() === details.customerName?.toLowerCase()) {
           const entry = { id: Date.now(), timestamp, type: 'payment', amount: details.price || 0, note: language === 'hi-IN' ? 'जमा' : 'Received payment' };
@@ -145,6 +174,19 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       });
       setCreditKhata(updatedKhata);
       localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(updatedKhata));
+
+      // If it's a service biz, also try to mark matching job as delivered/paid
+      const bizInfo = BUSINESS_TYPES.find(b => b.id === profile?.businessType);
+      if (bizInfo?.isService) {
+        const updatedJobs = jobs.map(j => {
+          if (j.customerName?.toLowerCase() === details.customerName?.toLowerCase() && j.status === 'Ready') {
+            return { ...j, status: 'Delivered' };
+          }
+          return j;
+        });
+        setJobs(updatedJobs);
+        localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updatedJobs));
+      }
       return;
     }
 
@@ -154,7 +196,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     setSales(updatedSales);
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(updatedSales));
 
-    // Stock update logic remains same
+    // Stock update logic
     const soldQty = Number(details.quantity) || 0;
     const prodName = (details.productName || "").toLowerCase();
     const updatedStock = stock.map(item => {
@@ -265,7 +307,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
           {!isHelper && (
             <>
               <TabsContent value="khata" className="m-0 p-4">
-                <CreditKhataTab language={language} customers={creditKhata} onUpdateCustomers={(k) => { setCreditKhata(k); localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(k)); }} profile={profile} sales={sales} />
+                <CreditKhataTab language={language} customers={creditKhata} onUpdateCustomers={(k) => { setCreditKhata(k); localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(k)); }} profile={profile} sales={sales} jobs={jobs} />
               </TabsContent>
               <TabsContent value="report" className="m-0 p-4">
                 <ReportTab role={role} privateMode={privateMode} language={language} sales={sales} expenses={expenses} profile={profile} />

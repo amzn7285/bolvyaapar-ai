@@ -1,11 +1,10 @@
-
 "use client";
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, CheckCircle2, Clock, Phone, History, ClipboardList, Check } from "lucide-react";
+import { MessageCircle, CheckCircle2, Clock, Phone, History, ClipboardList, Check, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -101,72 +100,79 @@ export default function OrdersTab({ language, isService, jobs, sales, onUpdateJo
             <p className="font-bold uppercase tracking-widest">{texts.empty}</p>
           </div>
         ) : (
-          filteredJobs.map((job) => (
-            <Card key={job.id} className={cn(
-              "rounded-[32px] border-l-8 shadow-md bg-white overflow-hidden",
-              job.status === 'Ready' ? "border-l-emerald-500" : job.status === 'Delivered' ? "border-l-slate-300" : "border-l-[#C45000]"
-            )}>
-              <CardContent className="p-6 space-y-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex gap-4">
-                    <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center text-3xl">👤</div>
-                    <div>
-                      <h4 className="text-xl font-black text-slate-800">{job.customerName}</h4>
-                      <p className="text-sm font-bold text-[#C45000]">{job.item}</p>
+          filteredJobs.map((job) => {
+            const balance = job.price - (job.advance || 0);
+            return (
+              <Card key={job.id} className={cn(
+                "rounded-[32px] border-l-8 shadow-md bg-white overflow-hidden",
+                job.status === 'Ready' ? "border-l-emerald-500" : job.status === 'Delivered' ? "border-l-slate-300" : "border-l-[#C45000]"
+              )}>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex gap-4">
+                      <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center text-3xl">👤</div>
+                      <div>
+                        <h4 className="text-xl font-black text-slate-800">{job.customerName}</h4>
+                        <p className="text-sm font-bold text-[#C45000]">{job.item}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="outline" className={cn(
+                        "text-[9px] font-black uppercase tracking-widest rounded-lg",
+                        job.status === 'Ready' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-500 border-slate-100"
+                      )}>
+                        {job.status}
+                      </Badge>
+                      <p className="text-2xl font-black text-slate-800 mt-2">₹{job.price}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="outline" className={cn(
-                      "text-[9px] font-black uppercase tracking-widest rounded-lg",
-                      job.status === 'Ready' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-slate-50 text-slate-500 border-slate-100"
-                    )}>
-                      {job.status}
-                    </Badge>
-                    <p className="text-2xl font-black text-slate-800 mt-2">₹{job.price}</p>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-50">
-                  <div className="flex flex-col gap-1">
-                    <p className="text-[9px] font-black text-slate-400 uppercase">Received</p>
-                    <p className="text-xs font-bold text-slate-700">{format(new Date(job.timestamp), 'dd MMM')}</p>
-                  </div>
-                  <div className="flex flex-col gap-1 text-right">
-                    <p className="text-[9px] font-black text-slate-400 uppercase">Advance</p>
-                    <p className="text-xs font-bold text-emerald-600">₹{job.advance}</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  {job.status === 'Received' && (
-                    <Button onClick={() => handleUpdateStatus(job.id, 'In Progress')} className="flex-1 h-14 rounded-2xl bg-[#0D2240] text-white font-black text-xs uppercase">
-                      Start Work
-                    </Button>
-                  )}
-                  {job.status === 'In Progress' && (
-                    <Button onClick={() => handleUpdateStatus(job.id, 'Ready')} className="flex-1 h-14 rounded-2xl bg-emerald-500 text-white font-black text-xs uppercase">
-                      Mark Ready
-                    </Button>
-                  )}
-                  {job.status === 'Ready' && (
-                    <>
-                      <Button onClick={() => handleNotify(job)} variant="outline" className="flex-1 h-14 rounded-2xl border-emerald-200 text-emerald-600 font-black text-xs uppercase gap-2">
-                        <MessageCircle size={18} /> {texts.notify}
-                      </Button>
-                      <Button onClick={() => handleUpdateStatus(job.id, 'Delivered')} className="flex-1 h-14 rounded-2xl bg-emerald-600 text-white font-black text-xs uppercase">
-                        Deliver
-                      </Button>
-                    </>
-                  )}
-                  {job.status === 'Delivered' && (
-                    <div className="w-full h-14 flex items-center justify-center gap-2 text-slate-300 font-black text-xs uppercase">
-                      <CheckCircle2 size={20} /> Delivered
+                  <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-50">
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[9px] font-black text-slate-400 uppercase">Received</p>
+                      <p className="text-xs font-bold text-slate-700">{format(new Date(job.timestamp), 'dd MMM')}</p>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                    <div className="flex flex-col gap-1 text-center">
+                      <p className="text-[9px] font-black text-slate-400 uppercase">Advance</p>
+                      <p className="text-xs font-bold text-emerald-600">₹{job.advance || 0}</p>
+                    </div>
+                    <div className="flex flex-col gap-1 text-right">
+                      <p className="text-[9px] font-black text-red-400 uppercase">Balance</p>
+                      <p className="text-xs font-bold text-red-600">₹{balance}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    {job.status === 'Received' && (
+                      <Button onClick={() => handleUpdateStatus(job.id, 'In Progress')} className="flex-1 h-14 rounded-2xl bg-[#0D2240] text-white font-black text-xs uppercase">
+                        Start Work
+                      </Button>
+                    )}
+                    {job.status === 'In Progress' && (
+                      <Button onClick={() => handleUpdateStatus(job.id, 'Ready')} className="flex-1 h-14 rounded-2xl bg-emerald-500 text-white font-black text-xs uppercase">
+                        Mark Ready
+                      </Button>
+                    )}
+                    {job.status === 'Ready' && (
+                      <>
+                        <Button onClick={() => handleNotify(job)} variant="outline" className="flex-1 h-14 rounded-2xl border-emerald-200 text-emerald-600 font-black text-xs uppercase gap-2">
+                          <MessageCircle size={18} /> {texts.notify}
+                        </Button>
+                        <Button onClick={() => handleUpdateStatus(job.id, 'Delivered')} className="flex-1 h-14 rounded-2xl bg-emerald-600 text-white font-black text-xs uppercase">
+                          Deliver & Clear
+                        </Button>
+                      </>
+                    )}
+                    {job.status === 'Delivered' && (
+                      <div className="w-full h-14 flex items-center justify-center gap-2 text-slate-300 font-black text-xs uppercase">
+                        <CheckCircle2 size={20} /> Delivered
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>

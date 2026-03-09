@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -6,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, MessageCircle, Phone, History, Camera, ArrowUpRight, ArrowDownLeft, X, Loader2, CheckCircle2 } from "lucide-react";
+import { Search, MessageCircle, Phone, History, Camera, ArrowUpRight, ArrowDownLeft, X, Loader2, CheckCircle2, ShieldAlert, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, differenceInDays } from "date-fns";
 
@@ -16,9 +15,10 @@ interface CreditKhataTabProps {
   onUpdateCustomers: (customers: any[]) => void;
   profile: any;
   sales: any[];
+  jobs?: any[];
 }
 
-export default function CreditKhataTab({ language, customers, onUpdateCustomers, profile, sales }: CreditKhataTabProps) {
+export default function CreditKhataTab({ language, customers, onUpdateCustomers, profile, sales, jobs = [] }: CreditKhataTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -70,7 +70,6 @@ export default function CreditKhataTab({ language, customers, onUpdateCustomers,
       : `Hi ${selectedCustomer.name}, here is a photo of your ledger page:`;
     window.open(`https://wa.me/${selectedCustomer.phone}?text=${encodeURIComponent(message)}`, '_blank');
     setIsCameraOpen(false);
-    // Stop camera stream
     if (videoRef.current?.srcObject) {
       (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
     }
@@ -91,8 +90,8 @@ export default function CreditKhataTab({ language, customers, onUpdateCustomers,
   };
 
   const texts = {
-    "hi-IN": { title: "क्रेडिट खाता (Udhar)", search: "नाम से खोजें", empty: "कोई ग्राहक नहीं मिला", history: "हिसाब", balance: "बाकी", remind: "रिमाइंडर", camera: "फोटो भेजें", lastItems: "पिछला सामान", lastPay: "पिछली जमा" },
-    "en-IN": { title: "Credit Khata", search: "Search by name", empty: "No customers found", history: "History", balance: "Due", remind: "Remind", camera: "Photo Share", lastItems: "Last Bought", lastPay: "Last Paid" }
+    "hi-IN": { title: "क्रेडिट खाता (Udhar)", search: "नाम से खोजें", empty: "कोई ग्राहक नहीं मिला", history: "हिसाब", balance: "बाकी", remind: "रिमाइंडर", camera: "फोटो भेजें", lastItems: "पिछला सामान", lastPay: "पिछली जमा", advance: "एडवांस" },
+    "en-IN": { title: "Credit Khata", search: "Search by name", empty: "No customers found", history: "History", balance: "Due", remind: "Remind", camera: "Photo Share", lastItems: "Last Bought", lastPay: "Last Paid", advance: "Advance" }
   }[language];
 
   return (
@@ -114,70 +113,91 @@ export default function CreditKhataTab({ language, customers, onUpdateCustomers,
       <div className="space-y-4">
         {filteredCustomers.length === 0 ? (
           <div className="text-center py-20 opacity-30 flex flex-col items-center">
-            <BookOpen size={64} className="mb-4" />
+            <Sparkles size={64} className="mb-4" />
             <p className="text-xl font-bold uppercase tracking-widest">{texts.empty}</p>
           </div>
         ) : (
-          filteredCustomers.map(customer => (
-            <Card key={customer.id} className="rounded-[32px] border-slate-100 shadow-md bg-white overflow-hidden active:scale-[0.98] transition-all">
-              <CardContent className="p-6 space-y-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-[24px] bg-[#C45000]/10 text-[#C45000] flex items-center justify-center font-black text-3xl">
-                      {customer.name[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="text-2xl font-black text-slate-800">{customer.name}</h4>
-                      <p className="text-xs text-slate-400 font-bold flex items-center gap-1 uppercase tracking-tighter"><Phone size={12} /> {customer.phone || '---'}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black uppercase text-red-400 tracking-widest mb-1">{texts.balance}</p>
-                    <p className="text-4xl font-black text-red-600">₹{customer.balance.toLocaleString()}</p>
-                  </div>
-                </div>
+          filteredCustomers.map(customer => {
+            const hasActiveJob = jobs.some(j => j.customerName?.toLowerCase() === customer.name.toLowerCase() && j.status !== 'Delivered');
+            const isFullyPaid = customer.balance === 0;
+            const isAdvance = hasActiveJob && !isFullyPaid;
 
-                <div className="grid grid-cols-2 gap-4 py-4 border-y border-slate-50">
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{texts.lastPay}</p>
-                    <p className="text-sm font-black text-slate-700">{getDaysSince(customer.lastPaymentAt)}</p>
+            return (
+              <Card key={customer.id} className={cn(
+                "rounded-[32px] border-slate-100 shadow-md bg-white overflow-hidden active:scale-[0.98] transition-all border-l-8",
+                isFullyPaid ? "border-l-emerald-500" : isAdvance ? "border-l-blue-500" : "border-l-red-500"
+              )}>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                      <div className={cn(
+                        "w-16 h-16 rounded-[24px] flex items-center justify-center font-black text-3xl",
+                        isFullyPaid ? "bg-emerald-50 text-emerald-600" : isAdvance ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-600"
+                      )}>
+                        {customer.name[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="text-2xl font-black text-slate-800">{customer.name}</h4>
+                        <p className="text-xs text-slate-400 font-bold flex items-center gap-1 uppercase tracking-tighter"><Phone size={12} /> {customer.phone || '---'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={cn(
+                        "text-[10px] font-black uppercase tracking-widest mb-1",
+                        isFullyPaid ? "text-emerald-400" : isAdvance ? "text-blue-400" : "text-red-400"
+                      )}>
+                        {isFullyPaid ? 'Settled' : isAdvance ? texts.advance : texts.balance}
+                      </p>
+                      <p className={cn(
+                        "text-4xl font-black",
+                        isFullyPaid ? "text-emerald-600" : isAdvance ? "text-blue-600" : "text-red-600"
+                      )}>
+                        ₹{customer.balance.toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-1 text-right">
-                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{texts.lastItems}</p>
-                    <p className="text-sm font-black text-slate-700 truncate">{getCustomerLastItems(customer.name) || '---'}</p>
-                  </div>
-                </div>
 
-                <div className="flex gap-3">
+                  <div className="grid grid-cols-2 gap-4 py-4 border-y border-slate-50">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{texts.lastPay}</p>
+                      <p className="text-sm font-black text-slate-700">{getDaysSince(customer.lastPaymentAt)}</p>
+                    </div>
+                    <div className="space-y-1 text-right">
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{texts.lastItems}</p>
+                      <p className="text-sm font-black text-slate-700 truncate">{getCustomerLastItems(customer.name) || '---'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={() => { setSelectedCustomer(customer); startCamera(); }} 
+                      variant="outline" 
+                      className="flex-1 h-14 rounded-2xl border-slate-100 text-slate-500 font-black text-xs uppercase gap-3 shadow-sm"
+                    >
+                      <Camera size={20} className="text-[#C45000]" /> {texts.camera}
+                    </Button>
+                    <Button 
+                      onClick={() => handleSendReminder(customer)} 
+                      className="flex-1 h-14 rounded-2xl bg-[#1A6B3C] text-white font-black text-xs uppercase gap-3 shadow-xl shadow-[#1A6B3C]/20"
+                    >
+                      <MessageCircle size={20} /> {texts.remind}
+                    </Button>
+                  </div>
+                  
                   <Button 
-                    onClick={() => { setSelectedCustomer(customer); startCamera(); }} 
-                    variant="outline" 
-                    className="flex-1 h-14 rounded-2xl border-slate-100 text-slate-500 font-black text-xs uppercase gap-3 shadow-sm"
+                    onClick={() => setSelectedCustomer(customer)} 
+                    variant="ghost" 
+                    className="w-full text-[10px] font-black uppercase text-slate-400 tracking-widest"
                   >
-                    <Camera size={20} className="text-[#C45000]" /> {texts.camera}
+                    <History size={14} className="mr-2" /> {texts.history}
                   </Button>
-                  <Button 
-                    onClick={() => handleSendReminder(customer)} 
-                    className="flex-1 h-14 rounded-2xl bg-[#1A6B3C] text-white font-black text-xs uppercase gap-3 shadow-xl shadow-[#1A6B3C]/20"
-                  >
-                    <MessageCircle size={20} /> {texts.remind}
-                  </Button>
-                </div>
-                
-                <Button 
-                  onClick={() => setSelectedCustomer(customer)} 
-                  variant="ghost" 
-                  className="w-full text-[10px] font-black uppercase text-slate-400 tracking-widest"
-                >
-                  <History size={14} className="mr-2" /> {texts.history}
-                </Button>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 
-      {/* History Dialog */}
       <Dialog open={!!selectedCustomer && !isCameraOpen} onOpenChange={() => setSelectedCustomer(null)}>
         <DialogContent className="max-w-[95vw] h-[85vh] flex flex-col p-0 border-none rounded-t-[40px] overflow-hidden">
           {selectedCustomer && (
@@ -206,9 +226,9 @@ export default function CreditKhataTab({ language, customers, onUpdateCustomers,
                       <div className="flex gap-4 items-center">
                         <div className={cn(
                           "w-12 h-12 rounded-2xl flex items-center justify-center",
-                          entry.type === 'credit' ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+                          entry.type === 'payment' ? "bg-emerald-50 text-emerald-600" : entry.type === 'advance_job' ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-600"
                         )}>
-                          {entry.type === 'credit' ? <ArrowUpRight size={24} /> : <ArrowDownLeft size={24} />}
+                          {entry.type === 'payment' ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}
                         </div>
                         <div>
                           <p className="text-base font-black text-slate-800">{entry.note}</p>
@@ -217,9 +237,9 @@ export default function CreditKhataTab({ language, customers, onUpdateCustomers,
                       </div>
                       <p className={cn(
                         "text-xl font-black",
-                        entry.type === 'credit' ? "text-red-600" : "text-emerald-600"
+                        entry.type === 'payment' ? "text-emerald-600" : entry.type === 'advance_job' ? "text-blue-600" : "text-red-600"
                       )}>
-                        {entry.type === 'credit' ? '+' : '-'} ₹{entry.amount.toLocaleString()}
+                        {entry.type === 'payment' ? '-' : '+'} ₹{entry.amount.toLocaleString()}
                       </p>
                     </div>
                   ))
@@ -230,30 +250,18 @@ export default function CreditKhataTab({ language, customers, onUpdateCustomers,
         </DialogContent>
       </Dialog>
 
-      {/* Camera Dialog */}
       <Dialog open={isCameraOpen} onOpenChange={setIsCameraOpen}>
         <DialogContent className="max-w-full h-svh p-0 border-none rounded-none bg-black flex flex-col items-center justify-center">
           <div className="relative w-full flex-1">
             <video ref={videoRef} className="w-full h-full object-cover" autoPlay playsInline muted />
-            <button 
-              onClick={() => setIsCameraOpen(false)} 
-              className="absolute top-8 right-6 h-12 w-12 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"
-            >
+            <button onClick={() => setIsCameraOpen(false)} className="absolute top-8 right-6 h-12 w-12 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md">
               <X size={24} />
             </button>
           </div>
           <div className="h-40 bg-black w-full flex items-center justify-center gap-12 px-8">
-            <div className="w-16" /> {/* Placeholder for alignment */}
-            <button 
-              onClick={takePhoto}
-              className="h-20 w-20 rounded-full border-4 border-white bg-transparent flex items-center justify-center active:scale-90 transition-all"
-            >
+            <button onClick={takePhoto} className="h-20 w-20 rounded-full border-4 border-white bg-transparent flex items-center justify-center active:scale-90 transition-all">
               <div className="h-16 w-16 rounded-full bg-white" />
             </button>
-            <div className="flex flex-col items-center gap-1 opacity-50">
-              <Phone className="text-white" size={24} />
-              <span className="text-white text-[10px] font-bold uppercase">WhatsApp</span>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
