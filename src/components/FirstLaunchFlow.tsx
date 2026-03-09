@@ -53,6 +53,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
         recognition.onstart = () => {
           setIsListening(true);
           setMicError(false);
+          setTranscript("");
         };
 
         recognition.onresult = (e: any) => {
@@ -62,9 +63,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
 
         recognition.onend = () => {
           setIsListening(false);
-          if (transcript) {
-            handleVoiceAction(transcript);
-          }
+          // If transcript exists, it will be handled by the button or auto-save logic if added
         };
 
         recognition.onerror = (event: any) => {
@@ -79,7 +78,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
         setMicError(true);
       }
     }
-  }, [language, transcript]);
+  }, [language]);
 
   const speak = (text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -91,6 +90,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
   const startListening = () => {
     if (isListening) {
       recognitionRef.current?.stop();
+      if (transcript) handleVoiceAction(transcript);
       return;
     }
     setTranscript("");
@@ -107,7 +107,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
     try {
       let systemPrompt = "";
       if (step === 3) {
-        systemPrompt = `Extract stock/inventory details from voice. Context: ${formData.businessType}. Return ONLY JSON: {"name": "item name", "qty": number, "unit": "kg/L/pieces/etc", "emoji": "emoji"}`;
+        systemPrompt = `Extract stock details from voice. Context: ${formData.businessType}. Return ONLY JSON: {"name": "item name", "qty": number, "unit": "kg/L/pieces/etc", "emoji": "emoji", "price": number}`;
       } else if (step === 4) {
         systemPrompt = `Extract sale details from voice. Return ONLY JSON: {"productName": "item", "price": number, "quantity": number}`;
       }
@@ -129,7 +129,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
           setFormData(prev => ({ ...prev, firstSale: parsed }));
           speak(language === 'hi-IN' ? "बिक्री दर्ज हो गई" : "Sale recorded");
         }
-        setManualInput(""); // Clear manual input field
+        setManualInput(""); // Clear manual input only on success
       }
     } catch (e) {
       console.error(e);
@@ -140,7 +140,11 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
   };
 
   const handleNext = () => {
-    setStep(prev => prev + 1);
+    if (step < 5) {
+      setStep(prev => prev + 1);
+    } else {
+      finishSetup();
+    }
   };
 
   const finishSetup = () => {
@@ -151,7 +155,6 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
     };
     localStorage.setItem("bolvyapar_profile", JSON.stringify(finalProfile));
     
-    // Initialize stock data with the first item
     if (formData.firstStock) {
       const stockItem = {
         ...formData.firstStock,
@@ -164,7 +167,6 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
       localStorage.setItem("bolvyapar_stock_data", JSON.stringify([stockItem]));
     }
 
-    // Initialize sales history with the first sale
     if (formData.firstSale) {
       const saleItem = {
         ...formData.firstSale,
@@ -336,7 +338,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
                       </h4>
                       <p className="text-white/40 text-sm font-bold">
                         {step === 3 
-                          ? `${formData.firstStock.qty} ${formData.firstStock.unit}`
+                          ? `${formData.firstStock.qty} ${formData.firstStock.unit} ${formData.firstStock.price ? '• ₹' + formData.firstStock.price : ''}`
                           : `₹${formData.firstSale.price} • ${formData.firstSale.quantity || 1} units`}
                       </p>
                     </div>
