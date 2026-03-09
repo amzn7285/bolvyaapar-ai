@@ -11,10 +11,8 @@ interface PinLockProps {
 }
 
 const LANGUAGES = [
-  { code: "hi-IN", label: "🇮🇳 हिंदी", active: true },
-  { code: "en-IN", label: "🇬🇧 English", active: true },
-  { code: "te-IN", label: "తెలుగు", active: false },
-  { code: "ta-IN", label: "தமிழ்", active: false },
+  { code: "hi-IN", label: "🇮🇳 हिंदी" },
+  { code: "en-IN", label: "🇬🇧 English" },
 ];
 
 export default function PinLock({ onAuth, language, onLanguageChange }: PinLockProps) {
@@ -82,14 +80,12 @@ export default function PinLock({ onAuth, language, onLanguageChange }: PinLockP
             {LANGUAGES.map((lang) => (
               <button
                 key={lang.code}
-                disabled={!lang.active}
-                onClick={() => lang.active && onLanguageChange(lang.code as any)}
+                onClick={() => onLanguageChange(lang.code as any)}
                 className={cn(
                   "relative flex flex-col items-center justify-center h-20 rounded-[20px] border transition-all",
                   language === lang.code 
                     ? "border-[#C45000] bg-[#C45000]/10 ring-1 ring-[#C45000]" 
-                    : "border-white/10 bg-white/5",
-                  !lang.active && "opacity-20 grayscale cursor-not-allowed"
+                    : "border-white/10 bg-white/5"
                 )}
               >
                 <span className="text-xl leading-none">{lang.label.split(' ')[0]}</span>

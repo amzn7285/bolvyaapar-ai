@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Home, Package, BarChart3, Settings, Lock, BookOpen, Eye, EyeOff, Volume2, X } from "lucide-react";
+import { Home, Package, BarChart3, Lock, BookOpen, Eye, EyeOff, Volume2 } from "lucide-react";
 import DukaanTab from "./tabs/DukaanTab";
 import StockTab from "./tabs/StockTab";
 import ReportTab from "./tabs/ReportTab";
@@ -38,8 +37,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const [stock, setStock] = useState<any[]>(DEFAULT_STOCK);
   const [creditKhata, setCreditKhata] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
-  const [currentLesson, setCurrentLesson] = useState<string | null>(null);
-  const [showLessonCard, setShowLessonCard] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   useEffect(() => {
@@ -72,7 +69,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const handleTransaction = (details: any) => {
     const timestamp = new Date().toISOString();
     
-    // 1. Handle Expenses
     if (details.isExpense) {
       const newExpense = {
         id: Date.now(),
@@ -86,7 +82,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       return;
     }
 
-    // 2. Handle Credit (Udhar)
     if (details.isCredit) {
       const updatedKhata = creditKhata.map(c => {
         if (c.name.toLowerCase() === details.customerName?.toLowerCase()) {
@@ -99,7 +94,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(updatedKhata));
     }
 
-    // 3. Handle Payment (Jama)
     if (details.isPayment) {
       const updatedKhata = creditKhata.map(c => {
         if (c.name.toLowerCase() === details.customerName?.toLowerCase()) {
@@ -110,10 +104,9 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       });
       setCreditKhata(updatedKhata);
       localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(updatedKhata));
-      return; // Payment isn't a "sale" of goods
+      return;
     }
 
-    // 4. Handle Normal Sales
     const newSale = {
       id: Date.now(),
       timestamp,
@@ -127,7 +120,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     setSales(updatedSales);
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(updatedSales));
 
-    // Update Stock Logic
     const soldQty = Number(details.quantity) || 0;
     const prodName = (details.productName || "").toLowerCase();
 
@@ -255,17 +247,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
         </Tabs>
       </main>
 
-      {showLessonCard && !privateMode && currentLesson && (
-        <div className="fixed bottom-28 left-4 right-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom-full duration-500 z-50 flex items-center gap-4">
-          <div className="text-3xl">📚</div>
-          <div className="flex-1">
-            <p className="text-[10px] font-black text-[#C45000] uppercase tracking-widest">Insight</p>
-            <p className="text-sm font-bold">{currentLesson}</p>
-          </div>
-          <button onClick={() => setShowLessonCard(false)} className="text-slate-400 p-2"><X size={20} /></button>
-        </div>
-      )}
-
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 pb-safe z-[60] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <div className="flex justify-between items-center max-w-md mx-auto relative h-16">
           <NavBtn icon={<Home size={22} />} label={texts.dukaan} active={activeTab === 'dukaan'} onClick={() => setActiveTab('dukaan')} />
@@ -282,7 +263,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
               language={language} 
               privateMode={privateMode} 
               onTransactionSuccess={handleTransaction} 
-              onLessonGenerated={(l) => { setCurrentLesson(l); setShowLessonCard(true); }}
               onSummaryRequested={handleDailySummary}
               salesHistory={sales}
               compact

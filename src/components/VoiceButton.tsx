@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Mic, Loader2, Send, Keyboard, X } from "lucide-react";
+import { Mic, Loader2, Keyboard, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,6 @@ interface VoiceButtonProps {
   language: "hi-IN" | "en-IN";
   privateMode: boolean;
   onTransactionSuccess: (details: any) => void;
-  onLessonGenerated: (lessonText: string) => void;
   onSummaryRequested?: () => void;
   salesHistory?: any[];
   compact?: boolean;
@@ -21,7 +19,6 @@ export default function VoiceButton({
   language,
   privateMode,
   onTransactionSuccess,
-  onLessonGenerated,
   onSummaryRequested,
   salesHistory = [],
   compact,
@@ -98,8 +95,7 @@ export default function VoiceButton({
         "price": number,
         "isExpense": boolean,
         "isCredit": boolean,
-        "isPayment": boolean,
-        "lessonText": "1-sentence business insight"
+        "isPayment": boolean
       }
       Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
 
@@ -116,7 +112,6 @@ export default function VoiceButton({
         const parsed = JSON.parse(jsonMatch[0]);
         speak(parsed.spokenResponse);
         onTransactionSuccess(parsed);
-        onLessonGenerated(parsed.lessonText);
       }
 
       setTextQuery("");

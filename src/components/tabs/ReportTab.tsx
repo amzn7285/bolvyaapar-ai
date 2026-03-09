@@ -1,10 +1,9 @@
-
 "use client";
 
 import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Lock, Eye, Share2, Download, TrendingUp, MinusCircle, Users, Star, Calendar, MessageCircle } from "lucide-react";
+import { Eye, Share2, Download, TrendingUp, MinusCircle, Users, Star, Calendar, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -18,10 +17,7 @@ interface ReportTabProps {
 }
 
 export default function ReportTab({ language, privateMode, sales, expenses, profile }: ReportTabProps) {
-  const [isLocked, setIsLocked] = useState(true);
-  const [pin, setPin] = useState("");
   const [revealProfit, setRevealProfit] = useState(false);
-  const [error, setError] = useState(false);
   const { toast } = useToast();
 
   const today = new Date().toDateString();
@@ -59,16 +55,6 @@ export default function ReportTab({ language, privateMode, sales, expenses, prof
       .slice(0, 10);
   }, [sales, language]);
 
-  const handlePinDigit = (digit: string) => {
-    if (pin.length >= 4) return;
-    const newPin = pin + digit;
-    setPin(newPin);
-    if (newPin.length === 4) {
-      if (newPin === "1234") { setIsLocked(false); setPin(""); }
-      else { setTimeout(() => { setPin(""); setError(true); }, 300); }
-    }
-  };
-
   const handleWeeklyShare = () => {
     const itemTrends: Record<string, number> = {};
     sales.slice(0, 50).forEach(s => {
@@ -96,46 +82,21 @@ export default function ReportTab({ language, privateMode, sales, expenses, prof
 
   const texts = {
     "hi-IN": {
-      title: "रिपोर्ट सुरक्षित", enter: "मालिक का PIN दर्ज करें", revenue: "आज की कुल बिक्री",
+      revenue: "आज की कुल बिक्री",
       expenses: "आज के खर्चे", profit: "आज का मुनाफा", insights: "AI एनालिसिस",
-      customers: "खास ग्राहक", whatsapp: "शेयर ट्रेंड्स", lock: "लॉक करें", reveal: "देखें", remind: "रिमाइंडर"
+      customers: "खास ग्राहक", whatsapp: "शेयर ट्रेंड्स", reveal: "देखें", remind: "रिमाइंडर"
     },
     "en-IN": {
-      title: "Reports Secure", enter: "Enter Owner PIN", revenue: "TODAY'S REVENUE",
+      revenue: "TODAY'S REVENUE",
       expenses: "TODAY'S EXPENSES", profit: "NET PROFIT", insights: "AI BUSINESS INSIGHTS",
-      customers: "TOP CUSTOMERS", whatsapp: "Share Trends", lock: "Lock", reveal: "Reveal", remind: "Remind"
+      customers: "TOP CUSTOMERS", whatsapp: "Share Trends", reveal: "Reveal", remind: "Remind"
     }
   }[language];
 
-  if (isLocked) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[50svh] space-y-8 px-4 animate-in fade-in zoom-in-95">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="p-6 bg-white rounded-[24px] shadow-xl border border-slate-100">
-            <Lock className={cn("w-10 h-10", error ? "text-destructive" : "text-[#0D2240]")} />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-lg font-black text-slate-900">{texts.title}</h2>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{texts.enter}</p>
-          </div>
-        </div>
-        <div className="flex gap-4">
-          {[0, 1, 2, 3].map(i => <div key={i} className={cn("w-4 h-4 rounded-full border-2 transition-all", pin.length > i ? "bg-[#C45000] border-[#C45000]" : "border-slate-200")} />)}
-        </div>
-        <div className="grid grid-cols-3 gap-4 w-full max-w-[260px]">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => <button key={n} onClick={() => handlePinDigit(n.toString())} className="h-14 w-14 rounded-2xl bg-white shadow-sm border border-slate-100 text-xl font-bold flex items-center justify-center active:bg-slate-100">{n}</button>)}
-          <div /> <button onClick={() => handlePinDigit("0")} className="h-14 w-14 rounded-2xl bg-white shadow-sm border border-slate-100 text-xl font-bold flex items-center justify-center active:bg-slate-100">0</button>
-          <button onClick={() => setPin(pin.slice(0, -1))} className="h-14 w-14 flex items-center justify-center text-slate-300 font-bold">⌫</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-      <div className="flex items-center justify-between px-1">
+      <div className="px-1">
         <h2 className="text-lg font-black text-slate-900 tracking-tight">Business Reports</h2>
-        <button onClick={() => setIsLocked(true)} className="flex items-center gap-2 h-10 px-4 bg-slate-100 text-slate-500 rounded-xl text-[10px] font-bold uppercase"><Lock size={14} /> {texts.lock}</button>
       </div>
 
       <div className="grid grid-cols-1 gap-4">
