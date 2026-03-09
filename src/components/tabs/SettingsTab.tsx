@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -6,8 +5,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Store, User, Phone, Users, ShieldCheck } from "lucide-react";
+import { Store, User, Phone, Users, ShieldCheck, ShoppingBasket, Scissors, Wrench, Utensils, Truck } from "lucide-react";
 
 interface SettingsTabProps {
   language: "hi-IN" | "en-IN";
@@ -15,9 +15,18 @@ interface SettingsTabProps {
   onUpdateProfile: (profile: any) => void;
 }
 
+const BUSINESS_TYPES = [
+  { id: 'kirana', icon: <ShoppingBasket size={18} />, en: "Kirana / General Store", hi: "किराना / जनरल स्टोर" },
+  { id: 'tailor', icon: <Scissors size={18} />, en: "Tailor / Boutique", hi: "दर्जी / बुटीक" },
+  { id: 'repair', icon: <Wrench size={18} />, en: "Repair Shop", hi: "रिपेयर शॉप" },
+  { id: 'dhaba', icon: <Utensils size={18} />, en: "Dhaba / Restaurant", hi: "ढाबा / रेस्टोरेंट" },
+  { id: 'milk', icon: <Truck size={18} />, en: "Milk Delivery", hi: "दूध की डिलीवरी" },
+];
+
 export default function SettingsTab({ language, profile, onUpdateProfile }: SettingsTabProps) {
   const [formData, setFormData] = useState(profile || {
     shopName: "",
+    businessType: "kirana",
     ownerName: "",
     ownerPhone: "",
     supplierName: "",
@@ -30,6 +39,7 @@ export default function SettingsTab({ language, profile, onUpdateProfile }: Sett
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onUpdateProfile(formData);
+    localStorage.setItem("bolvyapar_profile", JSON.stringify(formData));
     toast({ title: language === 'hi-IN' ? "प्रोफ़ाइल अपडेट हो गई!" : "Profile Updated!" });
   };
 
@@ -38,6 +48,7 @@ export default function SettingsTab({ language, profile, onUpdateProfile }: Sett
       title: "सेटिंग्स",
       subtitle: "व्यापार की जानकारी बदलें",
       shop: "दुकान का नाम",
+      bizType: "व्यापार का प्रकार",
       owner: "मालिक का नाम",
       ownerPhone: "मालिक का WhatsApp",
       supplier: "सप्लायर का नाम",
@@ -50,6 +61,7 @@ export default function SettingsTab({ language, profile, onUpdateProfile }: Sett
       title: "Settings",
       subtitle: "Update business profile",
       shop: "Shop Name",
+      bizType: "Business Type",
       owner: "Owner Name",
       ownerPhone: "Owner WhatsApp",
       supplier: "Supplier Name",
@@ -81,6 +93,30 @@ export default function SettingsTab({ language, profile, onUpdateProfile }: Sett
                   value={formData.shopName}
                   onChange={e => setFormData({...formData, shopName: e.target.value})}
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                  <ShoppingBasket size={12} /> {texts.bizType}
+                </Label>
+                <Select 
+                  value={formData.businessType} 
+                  onValueChange={(val) => setFormData({...formData, businessType: val})}
+                >
+                  <SelectTrigger className="bg-slate-50 border-slate-100 h-12 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {BUSINESS_TYPES.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        <div className="flex items-center gap-2">
+                          {type.icon}
+                          <span>{language === 'hi-IN' ? type.hi : type.en}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

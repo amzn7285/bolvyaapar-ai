@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -6,16 +5,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Store, User, Phone, Users, ShieldCheck } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Store, User, Phone, Users, ShieldCheck, ShoppingBasket, Scissors, Wrench, Utensils, Truck } from "lucide-react";
 
 interface ProfileSetupProps {
   onComplete: () => void;
   language: "hi-IN" | "en-IN";
 }
 
+const BUSINESS_TYPES = [
+  { id: 'kirana', icon: <ShoppingBasket size={18} />, en: "Kirana / General Store", hi: "किराना / जनरल स्टोर" },
+  { id: 'tailor', icon: <Scissors size={18} />, en: "Tailor / Boutique", hi: "दर्जी / बुटीक" },
+  { id: 'repair', icon: <Wrench size={18} />, en: "Repair Shop", hi: "रिपेयर शॉप" },
+  { id: 'dhaba', icon: <Utensils size={18} />, en: "Dhaba / Restaurant", hi: "ढाबा / रेस्टोरेंट" },
+  { id: 'milk', icon: <Truck size={18} />, en: "Milk Delivery", hi: "दूध की डिलीवरी" },
+];
+
 export default function ProfileSetup({ onComplete, language }: ProfileSetupProps) {
   const [formData, setFormData] = useState({
     shopName: "",
+    businessType: "kirana",
     ownerName: "",
     ownerPhone: "",
     supplierName: "",
@@ -35,6 +44,7 @@ export default function ProfileSetup({ onComplete, language }: ProfileSetupProps
       title: "प्रोफ़ाइल सेटअप",
       subtitle: "अपने व्यापार की जानकारी भरें",
       shop: "दुकान का नाम",
+      bizType: "व्यापार का प्रकार",
       owner: "मालिक का नाम",
       ownerPhone: "मालिक का WhatsApp नंबर",
       supplier: "सप्लायर का नाम",
@@ -47,6 +57,7 @@ export default function ProfileSetup({ onComplete, language }: ProfileSetupProps
       title: "Profile Setup",
       subtitle: "Complete your business profile",
       shop: "Shop Name",
+      bizType: "Business Type",
       owner: "Owner Name",
       ownerPhone: "Owner WhatsApp No.",
       supplier: "Supplier Name",
@@ -83,6 +94,30 @@ export default function ProfileSetup({ onComplete, language }: ProfileSetupProps
                     value={formData.shopName}
                     onChange={e => setFormData({...formData, shopName: e.target.value})}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-white/40 tracking-widest flex items-center gap-2">
+                    <ShoppingBasket size={12} /> {texts.bizType}
+                  </Label>
+                  <Select 
+                    value={formData.businessType} 
+                    onValueChange={(val) => setFormData({...formData, businessType: val})}
+                  >
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-14 rounded-2xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0D2240] border-white/10 text-white rounded-2xl">
+                      {BUSINESS_TYPES.map((type) => (
+                        <SelectItem key={type.id} value={type.id} className="focus:bg-white/10 focus:text-white">
+                          <div className="flex items-center gap-2">
+                            {type.icon}
+                            <span>{language === 'hi-IN' ? type.hi : type.en}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

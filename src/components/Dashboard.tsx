@@ -117,7 +117,8 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       item: details.productName || "Unknown Item",
       qty: details.quantity ? `${details.quantity} ${details.unit || ''}` : "---",
       customer: details.customerName || (language === 'hi-IN' ? 'ग्राहक' : 'Customer'),
-      amount: details.price || 0
+      amount: details.price || 0,
+      metadata: details.metadata
     };
 
     const updatedSales = [newSale, ...sales];
@@ -166,7 +167,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     const todaySales = sales.filter(s => new Date(s.timestamp).toDateString() === today);
     const totalSales = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
     
-    const systemPrompt = `Generate a 2-sentence summary of today's business. Total Sales: ₹${totalSales}. 
+    const systemPrompt = `Generate a 2-sentence summary of today's business. Total Sales: ₹${totalSales}. Business Type: ${profile?.businessType || 'General'}.
     Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. NO Net Profit details.`;
 
     try {
@@ -273,6 +274,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
               onTransactionSuccess={handleTransaction} 
               onSummaryRequested={handleDailySummary}
               salesHistory={sales}
+              businessType={profile?.businessType}
               compact
             />
           </div>

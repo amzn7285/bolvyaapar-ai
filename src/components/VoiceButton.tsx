@@ -13,6 +13,7 @@ interface VoiceButtonProps {
   onSummaryRequested?: () => void;
   salesHistory?: any[];
   compact?: boolean;
+  businessType?: string;
 }
 
 export default function VoiceButton({
@@ -22,6 +23,7 @@ export default function VoiceButton({
   onSummaryRequested,
   salesHistory = [],
   compact,
+  businessType = "kirana",
 }: VoiceButtonProps) {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -73,31 +75,56 @@ export default function VoiceButton({
     }
   };
 
+  const getSystemPrompt = () => {
+    let bizSpecifics = "";
+    switch (businessType) {
+      case 'tailor':
+        bizSpecifics = "For TAILORS: Map input to 'productName' (item), 'customerName', 'price' (advance amount), and 'metadata' containing 'deliveryDate' (date).";
+        break;
+      case 'repair':
+        bizSpecifics = "For REPAIR SHOPS: Map input to 'productName' (device), 'customerName', 'price' (estimated cost), and 'metadata' containing 'problem' (the issue).";
+        break;
+      case 'dhaba':
+        bizSpecifics = "For DHABA: Map input to 'productName' (items), 'price', and 'metadata' containing 'tableNumber'.";
+        break;
+      case 'milk':
+        bizSpecifics = "For MILK DELIVERY: Map input to 'customerName', 'quantity', and 'unit' (litres). Handle subscription updates.";
+        break;
+      default:
+        bizSpecifics = "For KIRANA: Map input to 'productName', 'quantity', 'unit', and 'price'.";
+    }
+
+    return `You are BolVyapar AI for a ${businessType.toUpperCase()} business. Parse voice input.
+    INTENTS:
+    1. Sale/Order: Primary business transaction.
+    2. Expense: Shop expense (kharcha).
+    3. Credit (Udhar): Customer takes credit.
+    4. Payment (Jama): Customer pays back.
+    
+    ${bizSpecifics}
+    
+    Return ONLY raw JSON:
+    {
+      "spokenResponse": "1-sentence confirmation in ${language === 'hi-IN' ? 'Hindi' : 'English'}",
+      "productName": "Item name or note",
+      "quantity": number,
+      "unit": "kg/L/etc",
+      "customerName": "Name or 'Customer'",
+      "price": number,
+      "isExpense": boolean,
+      "isCredit": boolean,
+      "isPayment": boolean,
+      "metadata": { "deliveryDate": "...", "problem": "...", "tableNumber": "..." }
+    }
+    Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
+  };
+
   const processQuery = async (query: string) => {
     if (!query.trim()) return;
 
     setIsProcessing(true);
     try {
-      const systemPrompt = `You are BolVyapar AI. Parse voice input.
-      INTENTS:
-      1. Sale: Item sold.
-      2. Expense: Shop expense (kharcha).
-      3. Credit (Udhar): Customer takes credit. Example: "Ramesh ko 200 ka udhar diya".
-      4. Payment (Jama): Customer pays back. Example: "Ramesh ne 150 diya".
-      
-      Return ONLY raw JSON:
-      {
-        "spokenResponse": "1-sentence confirmation in ${language === 'hi-IN' ? 'Hindi' : 'English'}",
-        "productName": "Item name or note",
-        "quantity": number,
-        "unit": "kg/L/etc",
-        "customerName": "Name or 'Customer'",
-        "price": number,
-        "isExpense": boolean,
-        "isCredit": boolean,
-        "isPayment": boolean
-      }
-      Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
+      const systemPrompt = getSystemPrompt();
 
       const response = await fetch("/api/chat", {
         method: "POST",

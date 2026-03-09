@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Eye, TrendingUp, BarChart2, Loader2, Wallet } from "lucide-react";
+import { Eye, TrendingUp, BarChart2, Loader2, Wallet, Scissors, Wrench, Utensils, Truck, ShoppingBasket } from "lucide-react";
 
 interface DukaanTabProps {
   privateMode: boolean;
@@ -25,24 +25,47 @@ export default function DukaanTab({ privateMode, language, sales, profile, total
 
   const texts = {
     "hi-IN": {
-      todaySales: "आज की बिक्री",
-      recentSales: "हाल की बिक्री",
+      todaySales: language === 'hi-IN' ? "आज की बिक्री" : "Today's Sales",
+      recentSales: "हाल की गतिविधियां",
       outstanding: "उधार बाकी",
       txns: "लेन-देन",
       tapToReveal: "टैप करें",
-      empty: "कोई बिक्री नहीं",
+      empty: "अभी तक कोई रिकॉर्ड नहीं",
       summary: "आज का हिसाब"
     },
     "en-IN": {
-      todaySales: "Today's Sales",
-      recentSales: "Recent Sales",
+      todaySales: "Today's Activity",
+      recentSales: "Recent Activity",
       outstanding: "Total Outstanding",
       txns: "txns",
       tapToReveal: "Tap to reveal",
-      empty: "No sales yet",
+      empty: "No records yet",
       summary: "Summary"
     }
   }[language];
+
+  const getBizIcon = () => {
+    switch (profile?.businessType) {
+      case 'tailor': return <Scissors size={20} />;
+      case 'repair': return <Wrench size={20} />;
+      case 'dhaba': return <Utensils size={20} />;
+      case 'milk': return <Truck size={20} />;
+      default: return <ShoppingBasket size={20} />;
+    }
+  };
+
+  const getTransactionLabel = (sale: any) => {
+    if (profile?.businessType === 'dhaba' && sale.metadata?.tableNumber) {
+      return `Table ${sale.metadata.tableNumber}`;
+    }
+    if (profile?.businessType === 'tailor' && sale.metadata?.deliveryDate) {
+      return `Delivery: ${sale.metadata.deliveryDate}`;
+    }
+    if (profile?.businessType === 'repair' && sale.metadata?.problem) {
+      return `Fix: ${sale.metadata.problem}`;
+    }
+    return sale.qty;
+  };
 
   return (
     <div className="space-y-4">
@@ -111,11 +134,13 @@ export default function DukaanTab({ privateMode, language, sales, profile, total
                 className="bg-white border border-slate-100 p-3 rounded-xl flex items-center justify-between shadow-sm active:bg-slate-50 transition-all"
               >
                 <div className="flex gap-3 items-center">
-                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">🛍️</div>
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">
+                    {getBizIcon()}
+                  </div>
                   <div>
                     <h4 className="font-bold text-sm text-slate-800">{sale.item}</h4>
                     <p className="text-[10px] text-slate-400 font-medium uppercase">
-                      {sale.qty} • {sale.customer}
+                      {getTransactionLabel(sale)} • {sale.customer}
                     </p>
                   </div>
                 </div>
