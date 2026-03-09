@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Home, Package, BarChart3, Lock, BookOpen, Eye, EyeOff, UserSquare2, Wallet } from "lucide-react";
+import { Home, Package, BarChart3, Lock, BookOpen, Eye, EyeOff, UserSquare2, MessageCircle, X, Sparkles, Share2 } from "lucide-react";
 import DukaanTab from "./tabs/DukaanTab";
 import StockTab from "./tabs/StockTab";
 import ReportTab from "./tabs/ReportTab";
@@ -10,6 +10,7 @@ import SettingsTab from "./tabs/SettingsTab";
 import CreditKhataTab from "./tabs/CreditKhataTab";
 import VoiceButton from "./VoiceButton";
 import CustomerView from "./CustomerView";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 interface DashboardProps {
@@ -45,6 +46,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const [creditKhata, setCreditKhata] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryModal, setSummaryModal] = useState<{ show: boolean, text: string, whatsappUrl: string } | null>(null);
   const [lastTransaction, setLastTransaction] = useState<any>(null);
 
   useEffect(() => {
@@ -190,25 +192,78 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     const today = new Date().toDateString();
     const todaySales = sales.filter(s => new Date(s.timestamp).toDateString() === today);
     const todayExpenses = expenses.filter(e => new Date(e.timestamp).toDateString() === today);
-    const totalSales = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-    const totalExp = todayExpenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
     
-    const systemPrompt = `Generate a 2-sentence summary of today's business. Total Sales: ₹${totalSales}. Total Expenses: ₹${totalExp}. Business Type: ${profile?.businessType || 'General'}.
-    Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. NEVER mention Net Profit figures.`;
+    // Calculate stats
+    const salesCount = todaySales.length;
+    
+    const itemMap: Record<string, number> = {};
+    todaySales.forEach(s => {
+      const qty = parseFloat(s.qty) || 1;
+      itemMap[s.item] = (itemMap[s.item] || 0) + qty;
+    });
+    const bestSellingItem = Object.entries(itemMap).sort((a, b) => b[1] - a[1])[0]?.[0] || "---";
+
+    let creditCount = 0;
+    creditKhata.forEach(c => {
+      const todayHistory = c.history?.filter((h: any) => h.type === 'credit' && new Date(h.timestamp).toDateString() === today);
+      creditCount += (todayHistory?.length || 0);
+    });
+
+    const expenseCount = todayExpenses.length;
+
+    const criticalStock = [...stock].sort((a, b) => a.level - b.level)[0];
+    const stockTip = criticalStock ? 
+      (language === 'hi-IN' ? `${criticalStock.hiName || criticalStock.name} खत्म होने वाला है, नया ऑर्डर दें।` : `${criticalStock.name} is low, order soon.`) : 
+      (language === 'hi-IN' ? "सब स्टॉक ठीक है।" : "Stock levels are healthy.");
+
+    // Business Terminology
+    const bizTerms: Record<string, { hi: string, en: string }> = {
+      dhaba: { hi: "खाना खिलाया", en: "dishes served" },
+      tailor: { hi: "ऑर्डर पूरे किए", en: "orders completed" },
+      repair: { hi: "रिपेयर किए", en: "jobs finished" },
+      milk: { hi: "डिलीवरी की", en: "deliveries done" },
+      kirana: { hi: "सामान बेचा", en: "items sold" },
+      medical: { hi: "दवाई बेची", en: "medicines sold" },
+      salon: { hi: "सर्विस दी", en: "services provided" },
+      other: { hi: "काम किया", en: "tasks completed" }
+    };
+    const term = bizTerms[profile?.businessType || 'other']?.[language] || bizTerms['other'][language];
+
+    const systemPrompt = `You are BolVyapar AI. Generate a 30-second spoken summary of today's business. 
+    Terminology to use: ${term}.
+    Data:
+    - ${salesCount} ${term}
+    - Top Item: ${bestSellingItem}
+    - ${creditCount} Credits Issued
+    - ${expenseCount} Expenses Logged
+    - Action Tip: ${stockTip}
+    
+    Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. NEVER mention net profit or exact money totals. Focus on counts and products. Keep it under 30 seconds.`;
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userMessage: "Today's summary", systemPrompt }),
+        body: JSON.stringify({ userMessage: "Give me my daily summary", systemPrompt }),
       });
       const data = await response.json();
       const text = data.reply || "";
+      
       if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = language;
         window.speechSynthesis.speak(utterance);
       }
+
+      // WhatsApp Message (Counts only, no rupees)
+      const shareMsg = language === 'hi-IN' 
+        ? `📊 *आज का हिसाब: ${profile?.shopName || 'BolVyapar Shop'}*\n\n✅ ${salesCount} ${term}\n🔥 खास: ${bestSellingItem}\n💸 ${creditCount} बार उधार दिया\n📉 ${expenseCount} खर्चे लिखे\n💡 टिप: ${stockTip}\n\n_BolVyapar AI द्वारा_`
+        : `📊 *Today's Summary: ${profile?.shopName || 'BolVyapar Shop'}*\n\n✅ ${salesCount} ${term}\n🔥 Best Seller: ${bestSellingItem}\n💸 ${creditCount} Credits Given\n📉 ${expenseCount} Expenses Logged\n💡 Tip: ${stockTip}\n\n_Generated by BolVyapar AI_`;
+      
+      const whatsappUrl = `https://wa.me/${profile?.ownerPhone}?text=${encodeURIComponent(shareMsg)}`;
+      
+      setSummaryModal({ show: true, text, whatsappUrl });
     } catch (err) {
       console.error(err);
     } finally {
@@ -221,8 +276,8 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const bizInfo = BUSINESS_TYPES.find(b => b.id === profile?.businessType) || BUSINESS_TYPES[0];
 
   const texts = {
-    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", khata: "खाता", report: "रिपोर्ट", customer: "ग्राहक व्यू" },
-    "en-IN": { dukaan: "Home", stock: "Stock", khata: "Khata", report: "Report", customer: "Customer View" }
+    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", khata: "खाता", report: "रिपोर्ट", customer: "ग्राहक व्यू", share: "WhatsApp पर शेयर करें" },
+    "en-IN": { dukaan: "Home", stock: "Stock", khata: "Khata", report: "Report", customer: "Customer View", share: "Share on WhatsApp" }
   }[language];
 
   if (isCustomerView) {
@@ -286,6 +341,30 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog open={!!summaryModal} onOpenChange={() => setSummaryModal(null)}>
+        <DialogContent className="max-w-[90vw] rounded-[40px] p-0 border-none bg-white overflow-hidden shadow-2xl">
+          <div className="bg-[#0D2240] p-8 text-white relative overflow-hidden">
+            <Sparkles size={80} className="absolute right-[-10px] top-[-10px] text-white/5" />
+            <button onClick={() => setSummaryModal(null)} className="absolute right-4 top-4 text-white/40"><X size={24} /></button>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-12 w-12 rounded-2xl bg-[#C45000] flex items-center justify-center text-2xl">📊</div>
+              <h2 className="text-2xl font-black uppercase tracking-tight">{language === 'hi-IN' ? 'आज का हिसाब' : "Today's Summary"}</h2>
+            </div>
+            <p className="text-white/80 leading-relaxed font-medium text-lg italic">{summaryModal?.text}</p>
+          </div>
+          <div className="p-8 bg-slate-50">
+            <a 
+              href={summaryModal?.whatsappUrl} 
+              target="_blank" 
+              className="w-full h-16 rounded-[24px] bg-[#1A6B3C] text-white flex items-center justify-center gap-3 text-lg font-black uppercase shadow-xl shadow-[#1A6B3C]/20 active:scale-95 transition-all"
+            >
+              <MessageCircle size={24} />
+              {texts.share}
+            </a>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 pb-safe z-[60] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <div className="flex justify-between items-center max-w-md mx-auto relative h-16">
