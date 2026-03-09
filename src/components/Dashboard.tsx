@@ -23,9 +23,9 @@ const SNOOZE_KEY = "bolvyapar_lesson_snooze";
 const SNOOZE_DURATION = 3600000;
 
 const DEFAULT_STOCK = [
-  { id: 'grains', emoji: '🌾', name: 'Grains', hiName: 'अनाज', qty: 100, unit: 'kg', level: 100 },
-  { id: 'dairy', emoji: '🥛', name: 'Dairy', hiName: 'डेयरी', qty: 50, unit: 'L', level: 100 },
-  { id: 'essentials', emoji: '🧼', name: 'Essentials', hiName: 'ज़रूरी सामान', qty: 200, unit: 'units', level: 100 },
+  { id: 'grains', emoji: '🌾', name: 'Grains', hiName: 'अनाज', qty: 100, unit: 'kg', level: 100, maxQty: 100 },
+  { id: 'dairy', emoji: '🥛', name: 'Dairy', hiName: 'डेयरी', qty: 50, unit: 'L', level: 100, maxQty: 50 },
+  { id: 'essentials', emoji: '🧼', name: 'Essentials', hiName: 'ज़रूरी सामान', qty: 200, unit: 'units', level: 100, maxQty: 200 },
 ];
 
 export default function Dashboard({ role, language, onLogout }: DashboardProps) {
@@ -38,7 +38,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const [currentLesson, setCurrentLesson] = useState<string | null>(null);
   const [showLessonCard, setShowLessonCard] = useState(false);
 
-  // Load data from localStorage on mount
   useEffect(() => {
     const savedSales = localStorage.getItem(SALES_STORAGE_KEY);
     if (savedSales) {
@@ -60,7 +59,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   }, []);
 
   const handleTransaction = (details: any) => {
-    // 1. Record the Sale
     const newSale = {
       id: Date.now(),
       timestamp: new Date().toISOString(),
@@ -75,35 +73,43 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     setLastTransaction(details);
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(updatedSales));
 
-    // 2. Reduce Stock
     const soldQty = Number(details.quantity) || 0;
     const prodName = (details.productName || "").toLowerCase();
 
     const updatedStock = stock.map(item => {
       let isMatch = false;
-      
-      // Simple matching logic
-      if (item.id === 'dairy' && (prodName.includes('milk') || prodName.includes('doodh') || prodName.includes('dairy'))) {
+      const itemName = item.name.toLowerCase();
+      const itemHiName = item.hiName.toLowerCase();
+
+      // Flexible matching for voice commands
+      if (prodName.includes(itemName) || prodName.includes(itemHiName)) {
         isMatch = true;
-      } else if (item.id === 'grains' && (prodName.includes('rice') || prodName.includes('grain') || prodName.includes('chawal') || prodName.includes('atta') || prodName.includes('wheat') || prodName.includes('dal'))) {
+      } else if (item.id === 'dairy' && (prodName.includes('milk') || prodName.includes('doodh'))) {
         isMatch = true;
-      } else if (item.id === 'essentials' && !isMatch) {
-        // Fallback to essentials if it doesn't match the specific categories
-        // We only want to fallback if it wasn't a match for previous ones
-        const otherCategoriesMatch = (prodName.includes('milk') || prodName.includes('doodh') || prodName.includes('rice') || prodName.includes('grain'));
-        if (!otherCategoriesMatch) isMatch = true;
+      } else if (item.id === 'grains' && (prodName.includes('rice') || prodName.includes('chawal') || prodName.includes('atta') || prodName.includes('wheat') || prodName.includes('dal'))) {
+        isMatch = true;
       }
 
       if (isMatch) {
         const newQty = Math.max(0, item.qty - soldQty);
-        // Calculate level percentage (assuming initial values as max for demo)
-        const maxQty = item.id === 'grains' ? 100 : item.id === 'dairy' ? 50 : 200;
+        const maxQty = item.maxQty || item.qty || 100;
         const newLevel = (newQty / maxQty) * 100;
         return { ...item, qty: newQty, level: newLevel };
       }
       return item;
     });
 
+    setStock(updatedStock);
+    localStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(updatedStock));
+  };
+
+  const handleAddCategory = (newCategory: any) => {
+    const updatedStock = [...stock, {
+      ...newCategory,
+      id: `cat-${Date.now()}`,
+      level: 100,
+      maxQty: newCategory.qty
+    }];
     setStock(updatedStock);
     localStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(updatedStock));
   };
@@ -144,7 +150,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
 
   return (
     <div className="flex flex-col h-full bg-[#F8FAFC] relative overflow-hidden">
-      {/* Professional Fintech Header */}
       <header className="bg-[#0D2240] px-6 py-4 flex items-center justify-between shadow-2xl z-20 shrink-0 border-b border-white/5">
         <div className="flex items-center gap-2">
           <div className="text-xl font-black flex items-baseline">
@@ -178,14 +183,13 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
         </div>
       </header>
 
-      {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto pb-48 pt-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
           <TabsContent value="dukaan" className="m-0 p-4">
             <DukaanTab privateMode={privateMode} language={language} sales={sales} />
           </TabsContent>
           <TabsContent value="stock" className="m-0 p-4">
-            <StockTab language={language} stock={stock} />
+            <StockTab language={language} stock={stock} onAddCategory={handleAddCategory} />
           </TabsContent>
           <TabsContent value="report" className="m-0 p-4">
             <ReportTab role={role} privateMode={privateMode} language={language} sales={sales} />
@@ -196,7 +200,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
         </Tabs>
       </main>
 
-      {/* Passive Lesson Card */}
       {showLessonCard && !privateMode && !showCustomerView && currentLesson && (
         <div className="fixed bottom-28 left-4 right-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom-full duration-500 z-50 flex items-center gap-4">
           <div className="text-3xl">📚</div>
@@ -220,13 +223,11 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
         </div>
       )}
 
-      {/* Fintech Style Bottom Navigation with Integrated Mic */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 pb-safe z-[60] shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <div className="flex justify-between items-center max-w-md mx-auto relative h-16">
           <NavBtn icon={<Home size={22} />} label={texts.dukaan} active={activeTab === 'dukaan'} onClick={() => setActiveTab('dukaan')} />
           <NavBtn icon={<Package size={22} />} label={texts.stock} active={activeTab === 'stock'} onClick={() => setActiveTab('stock')} />
           
-          {/* Raised Mic Button */}
           <div className="relative -top-8 flex flex-col items-center">
             <VoiceButton 
               language={language} 
