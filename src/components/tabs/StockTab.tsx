@@ -4,10 +4,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Volume2, Plus, AlertTriangle, Mic, Loader2, CheckCircle2, X } from "lucide-react";
+import { Volume2, Plus, AlertTriangle, Mic, Loader2, CheckCircle2, X, ShoppingCart, MessageCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface StockTabProps {
   language: "hi-IN" | "en-IN";
@@ -22,6 +23,7 @@ export default function StockTab({ language, stock, onAddCategory, sales, profil
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [tempResult, setTempResult] = useState<any>(null);
+  const { toast } = useToast();
 
   const recognitionRef = useRef<any>(null);
 
@@ -111,6 +113,52 @@ export default function StockTab({ language, stock, onAddCategory, sales, profil
     speak(text);
   };
 
+  const handleOrderStock = (item: any) => {
+    if (!profile?.supplierPhone) {
+      toast({
+        variant: "destructive",
+        title: language === 'hi-IN' ? "सप्लायर का नंबर नहीं है" : "Missing Supplier Number",
+        description: language === 'hi-IN' ? "कृपया सेटिंग्स में सप्लायर का WhatsApp नंबर जोड़ें।" : "Please add a Supplier WhatsApp number in Settings first.",
+      });
+      return;
+    }
+
+    // Calculate 7 day average
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const relevantSales = sales.filter(s => 
+      (s.item.toLowerCase() === item.name.toLowerCase() || s.item.toLowerCase() === (item.hiName || "").toLowerCase()) &&
+      new Date(s.timestamp) >= sevenDaysAgo
+    );
+
+    const totalSold = relevantSales.reduce((acc, curr) => {
+      const qtyStr = curr.qty?.split(' ')[0];
+      return acc + (parseFloat(qtyStr) || 1);
+    }, 0);
+
+    const avgDaily = totalSold / 7;
+    // Suggested reorder is 10 days of stock (avgDaily * 10) or original maxQty if no sales
+    let suggestedQty = Math.ceil(avgDaily * 10);
+    if (suggestedQty === 0) suggestedQty = item.maxQty || 10;
+
+    const term = {
+      tailor: language === 'hi-IN' ? 'कपड़ा (fabric)' : 'fabric',
+      repair: language === 'hi-IN' ? 'पुर्जे (parts)' : 'parts',
+      kirana: language === 'hi-IN' ? 'स्टॉक (stock)' : 'stock',
+      other: language === 'hi-IN' ? 'सामान (items)' : 'stock'
+    }[profile?.businessType as keyof typeof term] || term.other;
+
+    const itemName = language === 'hi-IN' ? (item.hiName || item.name) : item.name;
+    const shopName = profile?.shopName || "BolVyapar Shop";
+    
+    const message = language === 'hi-IN'
+      ? `नमस्ते, मैं ${shopName} से बोल रहा हूँ। हमें ${itemName} के ${suggestedQty} ${item.unit} ${term} की ज़रूरत है। कृपया जल्दी भेज दें। धन्यवाद!`
+      : `Hi, this is ${shopName}. We need a reorder of ${suggestedQty} ${item.unit} of ${itemName} (${term}). Please deliver it soon. Thanks!`;
+
+    window.open(`https://wa.me/${profile.supplierPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
   const texts = {
     "hi-IN": {
       title: "इन्वेंट्री स्टेटस",
@@ -121,7 +169,8 @@ export default function StockTab({ language, stock, onAddCategory, sales, profil
       cancel: "हटाओ",
       processing: "चेक कर रहा हूँ...",
       critical: "खत्म होने वाला",
-      healthy: "ज्यादा है"
+      healthy: "ज्यादा है",
+      orderNow: "📦 ऑर्डर करो"
     },
     "en-IN": {
       title: "Stock Status",
@@ -132,7 +181,8 @@ export default function StockTab({ language, stock, onAddCategory, sales, profil
       cancel: "Cancel",
       processing: "Processing...",
       critical: "Critical",
-      healthy: "Healthy"
+      healthy: "Healthy",
+      orderNow: "📦 Order Karo"
     }
   }[language];
 
@@ -245,16 +295,28 @@ export default function StockTab({ language, stock, onAddCategory, sales, profil
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => speakStockStatus(item)}
-                    className={cn(
-                      "w-full h-20 rounded-[30px] flex items-center justify-center gap-4 transition-all active:scale-95 shadow-lg",
-                      isRed ? "bg-red-50 text-red-600 border-2 border-red-100" : "bg-slate-50 text-slate-600 border-2 border-slate-100"
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                    <button 
+                      onClick={() => speakStockStatus(item)}
+                      className={cn(
+                        "w-full h-20 rounded-[30px] flex items-center justify-center gap-4 transition-all active:scale-95 shadow-md",
+                        isRed ? "bg-red-50 text-red-600 border-2 border-red-100" : "bg-slate-50 text-slate-600 border-2 border-slate-100"
+                      )}
+                    >
+                      <Volume2 size={32} />
+                      <span className="text-xl font-black uppercase tracking-widest">{language === 'hi-IN' ? 'सुनो' : 'Listen'}</span>
+                    </button>
+
+                    {isRed && (
+                      <button 
+                        onClick={() => handleOrderStock(item)}
+                        className="w-full h-20 rounded-[30px] bg-[#1A6B3C] text-white flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg shadow-[#1A6B3C]/20"
+                      >
+                        <ShoppingCart size={28} />
+                        <span className="text-xl font-black uppercase tracking-widest">{texts.orderNow}</span>
+                      </button>
                     )}
-                  >
-                    <Volume2 size={32} />
-                    <span className="text-xl font-black uppercase tracking-widest">{language === 'hi-IN' ? 'सुनो' : 'Listen'}</span>
-                  </button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
