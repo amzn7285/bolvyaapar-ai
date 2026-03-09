@@ -46,9 +46,6 @@ export default function VoiceButton({
         recognition.onerror = (e: any) => {
           console.error("Speech error:", e.error);
           setIsListening(false);
-          if (e.error === "not-allowed" || e.error === "service-not-allowed") {
-            setShowTextInput(true);
-          }
         };
         recognition.onend = () => setIsListening(false);
         recognitionRef.current = recognition;
@@ -64,7 +61,6 @@ export default function VoiceButton({
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = language;
     utterance.rate = 0.95;
-    utterance.pitch = 1.0;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -86,13 +82,11 @@ export default function VoiceButton({
   const processQuery = async (query: string) => {
     if (!query.trim()) return;
 
-    // Check for summary commands
     const queryLower = query.toLowerCase();
     if (onSummaryRequested && (
       queryLower.includes("hisaab") || 
       queryLower.includes("hisab") || 
       queryLower.includes("summary") || 
-      queryLower.includes("closing") || 
       queryLower.includes("सारांश")
     )) {
       onSummaryRequested();
@@ -103,19 +97,20 @@ export default function VoiceButton({
 
     setIsProcessing(true);
     try {
-      const systemPrompt = `You are BolVyapar AI, a shop assistant for Indian kirana stores. 
-Your task is to parse a voice transaction.
-Return ONLY a raw JSON object (no markdown, no other text) with:
+      const systemPrompt = `You are BolVyapar AI. Parse voice input.
+Return ONLY raw JSON:
 {
-  "spokenResponse": "A short, warm 1-sentence confirmation in ${language === 'hi-IN' ? 'Hindi' : 'English'}",
-  "productName": "Item name",
+  "spokenResponse": "1-sentence warm confirmation in ${language === 'hi-IN' ? 'Hindi' : 'English'}",
+  "productName": "Item or Expense name",
   "quantity": number,
-  "unit": "kg/L/units",
-  "customerName": "Name of customer if mentioned, else 'Customer'",
+  "unit": "kg/L/units/etc",
+  "customerName": "Name or 'Customer'",
   "price": number,
-  "lessonText": "A 1-sentence business insight based on this transaction"
+  "isExpense": boolean,
+  "lessonText": "1-sentence business insight"
 }
-Privacy: NEVER mention total revenue or profit margins in 'spokenResponse'.
+Privacy: NEVER speak revenue/profit in 'spokenResponse'.
+Determine 'isExpense' true if user says 'kharcha', 'spent', 'expense', 'bill bhara', etc.
 Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
 
       const response = await fetch("/api/chat", {
@@ -131,13 +126,14 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
       const rawReply = data.reply || "";
       
       let parsed = {
-        spokenResponse: language === "hi-IN" ? "बिक्री दर्ज हो गई!" : "Sale recorded!",
+        spokenResponse: language === "hi-IN" ? "दर्ज हो गया!" : "Recorded!",
         productName: query,
         quantity: 1,
         unit: "unit",
         customerName: language === "hi-IN" ? "ग्राहक" : "Customer",
         price: 0,
-        lessonText: language === "hi-IN" ? "अपना व्यापार बढ़ाते रहें!" : "Keep growing your business!"
+        isExpense: false,
+        lessonText: language === "hi-IN" ? "अपना व्यापार बढ़ाते रहें!" : "Keep growing!"
       };
 
       try {
@@ -147,7 +143,7 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
           parsed = { ...parsed, ...extracted };
         }
       } catch (e) {
-        console.warn("Failed to parse AI JSON response, using fallback.");
+        console.warn("AI JSON parse error", e);
       }
 
       speak(parsed.spokenResponse);
@@ -156,7 +152,8 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
         price: parsed.price,
         quantity: parsed.quantity,
         unit: parsed.unit,
-        customerName: parsed.customerName
+        customerName: parsed.customerName,
+        isExpense: parsed.isExpense
       });
       onLessonGenerated(parsed.lessonText);
 
@@ -164,11 +161,7 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
       setShowTextInput(false);
     } catch (err) {
       console.error("Voice AI Error:", err);
-      speak(
-        language === "hi-IN"
-          ? "माफ कीजिये, कुछ गड़बड़ हो गई।"
-          : "Sorry, an error occurred."
-      );
+      speak(language === "hi-IN" ? "गड़बड़ हो गई।" : "Error occurred.");
     } finally {
       setIsProcessing(false);
     }
@@ -187,21 +180,12 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
             <h3 className="text-[10px] font-black text-[#C45000] uppercase tracking-[0.2em]">
               {language === "hi-IN" ? "लिख कर बताएं" : "Type Command"}
             </h3>
-            <button
-              onClick={() => setShowTextInput(false)}
-              className="text-slate-400 p-2"
-            >
-              <X size={20} />
-            </button>
+            <button onClick={() => setShowTextInput(false)} className="text-slate-400 p-2"><X size={20} /></button>
           </div>
           <Input
             value={textQuery}
             onChange={(e) => setTextQuery(e.target.value)}
-            placeholder={
-              language === "hi-IN"
-                ? "जैसे: 5 किलो आटा बेचा..."
-                : "e.g. Sold 5kg flour..."
-            }
+            placeholder={language === "hi-IN" ? "जैसे: 500 का खर्चा हुआ..." : "e.g. Spent 500..."}
             className="h-16 text-sm border-slate-100 rounded-2xl bg-slate-50"
             autoFocus
           />
@@ -210,14 +194,7 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
             disabled={isProcessing || !textQuery.trim()}
             className="w-full h-16 rounded-2xl bg-[#C45000] text-white font-bold"
           >
-            {isProcessing ? (
-              <Loader2 className="animate-spin" />
-            ) : (
-              <>
-                <Send size={20} className="mr-2" />
-                {language === "hi-IN" ? "भेजें" : "Send"}
-              </>
-            )}
+            {isProcessing ? <Loader2 className="animate-spin" /> : <><Send size={20} className="mr-2" />{language === "hi-IN" ? "भेजें" : "Send"}</>}
           </Button>
         </div>
       </div>
@@ -236,11 +213,7 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
             isProcessing && "bg-slate-400 cursor-wait"
           )}
         >
-          {isProcessing ? (
-            <Loader2 className="text-white animate-spin" size={32} />
-          ) : (
-            <Mic className="text-white" size={32} />
-          )}
+          {isProcessing ? <Loader2 className="text-white animate-spin" size={32} /> : <Mic className="text-white" size={32} />}
         </button>
 
         <button
@@ -252,13 +225,7 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
       </div>
 
       <p className="mt-2 text-[10px] font-black text-[#C45000] uppercase tracking-tighter">
-        {isListening
-          ? language === "hi-IN"
-            ? "सुन रहा हूँ..."
-            : "Listening..."
-          : language === "hi-IN"
-          ? "बोलिए"
-          : "Tap to Speak"}
+        {isListening ? (language === "hi-IN" ? "सुन रहा हूँ..." : "Listening...") : (language === "hi-IN" ? "बोलिए" : "Tap to Speak")}
       </p>
     </div>
   );

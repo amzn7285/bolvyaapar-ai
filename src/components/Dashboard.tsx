@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Home, Package, BarChart3, BookOpen, Lock, Users, Eye, EyeOff, Volume2, X, Mic, Keyboard } from "lucide-react";
+import { Home, Package, BarChart3, BookOpen, Lock, Users, Eye, EyeOff, Volume2, X } from "lucide-react";
 import DukaanTab from "./tabs/DukaanTab";
 import StockTab from "./tabs/StockTab";
 import SeekhaTab from "./tabs/SeekhaTab";
@@ -18,6 +18,7 @@ interface DashboardProps {
 }
 
 const SALES_STORAGE_KEY = "bolvyapar_sales_history";
+const EXPENSES_STORAGE_KEY = "bolvyapar_expenses_history";
 const STOCK_STORAGE_KEY = "bolvyapar_stock_data";
 const SNOOZE_KEY = "bolvyapar_lesson_snooze";
 const SNOOZE_DURATION = 3600000;
@@ -33,6 +34,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const [privateMode, setPrivateMode] = useState(false);
   const [showCustomerView, setShowCustomerView] = useState(false);
   const [sales, setSales] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [stock, setStock] = useState<any[]>(DEFAULT_STOCK);
   const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [currentLesson, setCurrentLesson] = useState<string | null>(null);
@@ -42,27 +44,39 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   useEffect(() => {
     const savedSales = localStorage.getItem(SALES_STORAGE_KEY);
     if (savedSales) {
-      try {
-        setSales(JSON.parse(savedSales));
-      } catch (e) {
-        console.error("Failed to parse saved sales", e);
-      }
+      try { setSales(JSON.parse(savedSales)); } catch (e) { console.error(e); }
+    }
+
+    const savedExpenses = localStorage.getItem(EXPENSES_STORAGE_KEY);
+    if (savedExpenses) {
+      try { setExpenses(JSON.parse(savedExpenses)); } catch (e) { console.error(e); }
     }
 
     const savedStock = localStorage.getItem(STOCK_STORAGE_KEY);
     if (savedStock) {
-      try {
-        setStock(JSON.parse(savedStock));
-      } catch (e) {
-        console.error("Failed to parse saved stock", e);
-      }
+      try { setStock(JSON.parse(savedStock)); } catch (e) { console.error(e); }
     }
   }, []);
 
   const handleTransaction = (details: any) => {
+    const timestamp = new Date().toISOString();
+    
+    if (details.isExpense) {
+      const newExpense = {
+        id: Date.now(),
+        timestamp,
+        category: details.productName || (language === 'hi-IN' ? 'खर्चा' : 'Expense'),
+        amount: details.price || 0
+      };
+      const updatedExpenses = [newExpense, ...expenses];
+      setExpenses(updatedExpenses);
+      localStorage.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(updatedExpenses));
+      return;
+    }
+
     const newSale = {
       id: Date.now(),
-      timestamp: new Date().toISOString(),
+      timestamp,
       item: details.productName || "Unknown Item",
       qty: details.quantity ? `${details.quantity} ${details.unit || ''}` : "---",
       customer: details.customerName || (language === 'hi-IN' ? 'ग्राहक' : 'Customer'),
@@ -74,6 +88,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     setLastTransaction(details);
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(updatedSales));
 
+    // Update Stock
     const soldQty = Number(details.quantity) || 0;
     const prodName = (details.productName || "").toLowerCase();
 
@@ -109,10 +124,12 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
 
     const today = new Date().toDateString();
     const todaySales = sales.filter(s => new Date(s.timestamp).toDateString() === today);
-    const totalAmount = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const todayExpenses = expenses.filter(e => new Date(e.timestamp).toDateString() === today);
+    
+    const totalSales = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const totalExp = todayExpenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
     const count = todaySales.length;
     
-    // Find best selling item
     const itemCounts: Record<string, number> = {};
     todaySales.forEach(s => {
       itemCounts[s.item] = (itemCounts[s.item] || 0) + 1;
@@ -120,11 +137,11 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     const bestItem = Object.entries(itemCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "None";
 
     const systemPrompt = `You are BolVyapar AI. Generate a 2-3 sentence spoken summary of today's business. 
-Total Sales: ₹${totalAmount}, Transactions: ${count}, Best Seller: ${bestItem}.
-Include: A warm greeting, total revenue, transaction count, best product, and 1 short tip for tomorrow.
-Keep it under 30 seconds of speech.
-Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. 
-Respond ONLY with the summary text.`;
+Total Sales: ₹${totalSales}, Transactions: ${count}, Best Seller: ${bestItem}, Total Expenses: ₹${totalExp}.
+Include: Warm greeting, total revenue, transaction count, best product, total expenses, and 1 short tip.
+CRITICAL: NEVER mention Net Profit or exact profit margins aloud.
+Keep it under 30 seconds.
+Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. Respond ONLY with the summary text.`;
 
     try {
       const response = await fetch("/api/chat", {
@@ -242,7 +259,7 @@ Respond ONLY with the summary text.`;
             <StockTab language={language} stock={stock} onAddCategory={handleAddCategory} />
           </TabsContent>
           <TabsContent value="report" className="m-0 p-4">
-            <ReportTab role={role} privateMode={privateMode} language={language} sales={sales} />
+            <ReportTab role={role} privateMode={privateMode} language={language} sales={sales} expenses={expenses} />
           </TabsContent>
           <TabsContent value="seekha" className="m-0 p-4">
             <SeekhaTab language={language} />

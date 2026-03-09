@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Lock, Eye, Share2, Download, TrendingUp } from "lucide-react";
+import { Lock, Eye, Share2, Download, TrendingUp, MinusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ReportTabProps {
@@ -11,24 +11,23 @@ interface ReportTabProps {
   privateMode: boolean;
   language: "hi-IN" | "en-IN";
   sales: any[];
+  expenses: any[];
 }
 
-export default function ReportTab({ language, privateMode, sales }: ReportTabProps) {
+export default function ReportTab({ language, privateMode, sales, expenses }: ReportTabProps) {
   const [isLocked, setIsLocked] = useState(true);
   const [pin, setPin] = useState("");
-  const [revealMargin, setRevealMargin] = useState(false);
+  const [revealProfit, setRevealProfit] = useState(false);
   const [error, setError] = useState(false);
   const { toast } = useToast();
 
-  // Calculate stats from actual sales
-  const totalRevenue = sales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-  
-  // Find top product
-  const productCounts: Record<string, number> = {};
-  sales.forEach(s => {
-    productCounts[s.item] = (productCounts[s.item] || 0) + 1;
-  });
-  const bestProduct = Object.entries(productCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "---";
+  const today = new Date().toDateString();
+  const todaySales = sales.filter(s => new Date(s.timestamp).toDateString() === today);
+  const todayExpenses = expenses.filter(e => new Date(e.timestamp).toDateString() === today);
+
+  const totalRevenue = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const totalExp = todayExpenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const netProfit = totalRevenue - totalExp;
 
   const handlePinDigit = (digit: string) => {
     if (pin.length >= 4) return;
@@ -44,22 +43,24 @@ export default function ReportTab({ language, privateMode, sales }: ReportTabPro
     "hi-IN": {
       title: "रिपोर्ट सुरक्षित",
       enter: "मालिक का PIN दर्ज करें",
-      revenue: "हफ्ते की कुल कमाई",
-      bestProduct: "टॉप प्रोडक्ट",
-      margin: "मुनाफा",
+      revenue: "आज की कुल बिक्री",
+      expenses: "आज के खर्चे",
+      profit: "आज का मुनाफा",
       insights: "AI एनालिसिस",
       whatsapp: "शेयर समरी",
-      lock: "लॉक करें"
+      lock: "लॉक करें",
+      reveal: "देखें"
     },
     "en-IN": {
       title: "Reports Secure",
       enter: "Enter Owner PIN",
-      revenue: "WEEKLY REVENUE",
-      bestProduct: "TOP PRODUCT",
-      margin: "MARGIN",
+      revenue: "TODAY'S REVENUE",
+      expenses: "TODAY'S EXPENSES",
+      profit: "NET PROFIT",
       insights: "AI BUSINESS INSIGHTS",
       whatsapp: "Share Summary",
-      lock: "Lock"
+      lock: "Lock",
+      reveal: "Reveal"
     }
   }[language];
 
@@ -99,52 +100,55 @@ export default function ReportTab({ language, privateMode, sales }: ReportTabPro
         </button>
       </div>
 
-      <Card className="bg-[#0D2240] border-none rounded-[32px] overflow-hidden shadow-2xl">
-        <CardContent className="p-8 relative">
-          <TrendingUp size={80} className="absolute right-[-10px] bottom-[-10px] text-white/5" />
-          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-2">{texts.revenue}</p>
-          <p className={cn("text-[26px] font-black text-white", privateMode && "blur-xl")}>₹{totalRevenue.toLocaleString()}</p>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="rounded-[24px] border-slate-100 shadow-sm bg-white">
-          <CardContent className="p-5">
-            <p className="text-[10px] font-bold uppercase text-slate-400 mb-2">{texts.bestProduct}</p>
-            <p className="text-[22px] font-black text-slate-900 truncate">{bestProduct}</p>
+      <div className="grid grid-cols-1 gap-4">
+        <Card className="bg-[#0D2240] border-none rounded-[32px] overflow-hidden shadow-2xl">
+          <CardContent className="p-8 relative">
+            <TrendingUp size={80} className="absolute right-[-10px] bottom-[-10px] text-white/5" />
+            <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-2">{texts.revenue}</p>
+            <p className={cn("text-[26px] font-black text-white", privateMode && "blur-xl")}>₹{totalRevenue.toLocaleString()}</p>
           </CardContent>
         </Card>
-        <Card className="rounded-[24px] border-slate-100 shadow-sm bg-white">
-          <CardContent className="p-5">
-            <p className="text-[10px] font-bold uppercase text-slate-400 mb-2">{texts.margin}</p>
-            {revealMargin ? (
-              <p className="text-[22px] font-black text-[#1A6B3C]">15%</p>
-            ) : (
-              <button onClick={() => setRevealMargin(true)} className="h-10 px-4 bg-slate-50 rounded-xl text-[10px] font-bold uppercase text-[#C45000] border border-slate-100">👁️ Reveal</button>
-            )}
+
+        <Card className="bg-white border-slate-100 rounded-[32px] overflow-hidden shadow-sm">
+          <CardContent className="p-8 relative">
+            <MinusCircle size={80} className="absolute right-[-10px] bottom-[-10px] text-slate-50 opacity-10" />
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-2">{texts.expenses}</p>
+            <p className={cn("text-[26px] font-black text-red-600", privateMode && "blur-xl")}>₹{totalExp.toLocaleString()}</p>
           </CardContent>
         </Card>
       </div>
+
+      <Card className="rounded-[32px] border-slate-100 shadow-sm bg-white overflow-hidden">
+        <CardContent className="p-8 flex items-center justify-between">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase text-slate-400">{texts.profit}</p>
+            {revealProfit ? (
+              <p className={cn("text-[28px] font-black transition-all", netProfit >= 0 ? "text-[#1A6B3C]" : "text-red-600")}>
+                ₹{netProfit.toLocaleString()}
+              </p>
+            ) : (
+              <p className="text-[28px] font-black text-slate-200">₹••••••</p>
+            )}
+          </div>
+          <button 
+            onClick={() => setRevealProfit(!revealProfit)}
+            className="h-12 w-24 bg-slate-50 rounded-2xl text-[10px] font-black uppercase text-[#C45000] border border-slate-100 shadow-sm"
+          >
+            {revealProfit ? 'Hide' : texts.reveal}
+          </button>
+        </CardContent>
+      </Card>
 
       <div className="space-y-4">
         <h3 className="text-slate-900 text-lg font-black tracking-tight px-1">{texts.insights}</h3>
         <Card className="rounded-[32px] border-slate-100 shadow-sm bg-white">
           <CardContent className="p-6 space-y-6">
-            <div className="flex gap-4">
-              <div className="text-3xl">👥</div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase text-slate-400">Customer Trend</p>
-                <p className="text-sm font-bold text-slate-700 leading-tight">
-                  {sales.length > 5 ? "Most customers visit in the morning hours." : "Keep recording sales for insights."}
-                </p>
-              </div>
-            </div>
             <div className="p-5 bg-[#1A6B3C]/5 border border-[#1A6B3C]/10 rounded-2xl flex gap-4">
               <div className="text-3xl">💡</div>
               <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase text-[#1A6B3C]">Business Tip</p>
+                <p className="text-[10px] font-bold uppercase text-[#1A6B3C]">Profit Tip</p>
                 <p className="text-sm font-black text-slate-800">
-                  {sales.length > 0 ? `Your ${bestProduct} is popular! Stock more for tomorrow.` : "Record a sale to get a tip!"}
+                  {netProfit < 0 ? "Expenses are higher than sales today. Check for heavy utility costs." : "Healthy profit margins! Reinvest in fast-moving stock categories."}
                 </p>
               </div>
             </div>
