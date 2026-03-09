@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Home, Package, BarChart3, BookOpen, Lock, Users, Eye, EyeOff, Volume2, X } from "lucide-react";
+import { Home, Package, BarChart3, BookOpen, Lock, Users, Eye, EyeOff, Volume2, X, Mic, Keyboard } from "lucide-react";
 import DukaanTab from "./tabs/DukaanTab";
 import StockTab from "./tabs/StockTab";
 import SeekhaTab from "./tabs/SeekhaTab";
@@ -37,6 +37,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [currentLesson, setCurrentLesson] = useState<string | null>(null);
   const [showLessonCard, setShowLessonCard] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   useEffect(() => {
     const savedSales = localStorage.getItem(SALES_STORAGE_KEY);
@@ -102,6 +103,55 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     localStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(updatedStock));
   };
 
+  const handleDailySummary = async () => {
+    if (isGeneratingSummary) return;
+    setIsGeneratingSummary(true);
+
+    const today = new Date().toDateString();
+    const todaySales = sales.filter(s => new Date(s.timestamp).toDateString() === today);
+    const totalAmount = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+    const count = todaySales.length;
+    
+    // Find best selling item
+    const itemCounts: Record<string, number> = {};
+    todaySales.forEach(s => {
+      itemCounts[s.item] = (itemCounts[s.item] || 0) + 1;
+    });
+    const bestItem = Object.entries(itemCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "None";
+
+    const systemPrompt = `You are BolVyapar AI. Generate a 2-3 sentence spoken summary of today's business. 
+Total Sales: ₹${totalAmount}, Transactions: ${count}, Best Seller: ${bestItem}.
+Include: A warm greeting, total revenue, transaction count, best product, and 1 short tip for tomorrow.
+Keep it under 30 seconds of speech.
+Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. 
+Respond ONLY with the summary text.`;
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userMessage: "Give me today's business summary.",
+          systemPrompt: systemPrompt,
+        }),
+      });
+
+      const data = await response.json();
+      const text = data.reply || "";
+      
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = language;
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (err) {
+      console.error("Summary error:", err);
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
+
   const handleAddCategory = (newCategory: any) => {
     const updatedStock = [...stock, {
       ...newCategory,
@@ -128,7 +178,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     window.speechSynthesis.speak(utterance);
   };
 
-  // Calculate count of red stock items
   const redItemsCount = stock.filter(item => {
     const warning = item.lowStockLevel || 10;
     return item.qty < (warning * 0.15);
@@ -139,18 +188,8 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   }
 
   const texts = {
-    "hi-IN": {
-      dukaan: "दुकान",
-      stock: "स्टॉक",
-      report: "रिपोर्ट",
-      seekha: "सीखा",
-    },
-    "en-IN": {
-      dukaan: "Dukaan",
-      stock: "Stock",
-      report: "Report",
-      seekha: "Seekha",
-    }
+    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", report: "रिपोर्ट", seekha: "सीखा" },
+    "en-IN": { dukaan: "Dukaan", stock: "Stock", report: "Report", seekha: "Seekha" }
   }[language];
 
   return (
@@ -191,7 +230,13 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       <main className="flex-1 overflow-y-auto pb-48 pt-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
           <TabsContent value="dukaan" className="m-0 p-4">
-            <DukaanTab privateMode={privateMode} language={language} sales={sales} />
+            <DukaanTab 
+              privateMode={privateMode} 
+              language={language} 
+              sales={sales} 
+              onGenerateSummary={handleDailySummary}
+              isGeneratingSummary={isGeneratingSummary}
+            />
           </TabsContent>
           <TabsContent value="stock" className="m-0 p-4">
             <StockTab language={language} stock={stock} onAddCategory={handleAddCategory} />
@@ -245,6 +290,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
               privateMode={privateMode} 
               onTransactionSuccess={handleTransaction} 
               onLessonGenerated={handleLessonGenerated}
+              onSummaryRequested={handleDailySummary}
               compact
             />
           </div>

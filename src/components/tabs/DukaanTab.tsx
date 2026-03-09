@@ -3,19 +3,20 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Eye, TrendingUp } from "lucide-react";
+import { Eye, TrendingUp, BarChart2, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface DukaanTabProps {
   privateMode: boolean;
   language: "hi-IN" | "en-IN";
   sales: any[];
+  onGenerateSummary: () => void;
+  isGeneratingSummary?: boolean;
 }
 
-export default function DukaanTab({ privateMode, language, sales }: DukaanTabProps) {
+export default function DukaanTab({ privateMode, language, sales, onGenerateSummary, isGeneratingSummary }: DukaanTabProps) {
   const [revealedSales, setRevealedSales] = useState<Set<number>>(new Set());
   
-  // Calculate today's stats from the real sales array
   const today = new Date().toDateString();
   const todaySales = sales.filter(s => new Date(s.timestamp).toDateString() === today);
   const totalAmount = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
@@ -27,14 +28,16 @@ export default function DukaanTab({ privateMode, language, sales }: DukaanTabPro
       recentSales: "हाल की बिक्री",
       txns: "लेन-देन",
       tapToReveal: "कीमत देखने के लिए टैप करें",
-      empty: "कोई बिक्री नहीं"
+      empty: "कोई बिक्री नहीं",
+      summary: "आज का हिसाब"
     },
     "en-IN": {
       todaySales: "Today's Sales",
       recentSales: "Recent Sales",
       txns: "txns",
       tapToReveal: "Tap sale to reveal privately",
-      empty: "No sales yet"
+      empty: "No sales yet",
+      summary: "Today's Summary"
     }
   }[language];
 
@@ -44,12 +47,28 @@ export default function DukaanTab({ privateMode, language, sales }: DukaanTabPro
       <Card className="bg-[#0D2240] border-none rounded-[24px] overflow-hidden shadow-xl">
         <CardContent className="p-6 relative">
           <TrendingUp size={64} className="absolute right-[-10px] bottom-[-10px] text-white/5 rotate-12" />
-          <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-2">{texts.todaySales}</p>
-          <div className="flex items-baseline gap-1 mb-2">
-            <span className="text-xl font-bold text-[#C45000]">₹</span>
-            <span className={cn("text-[32px] font-black text-white transition-all", privateMode && "blur-xl")}>
-              {totalAmount.toLocaleString()}
-            </span>
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mb-1">{texts.todaySales}</p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-bold text-[#C45000]">₹</span>
+                <span className={cn("text-[32px] font-black text-white transition-all", privateMode && "blur-xl")}>
+                  {totalAmount.toLocaleString()}
+                </span>
+              </div>
+            </div>
+            <button 
+              onClick={onGenerateSummary}
+              disabled={isGeneratingSummary || count === 0}
+              className="flex items-center gap-2 px-3 py-2 bg-[#C45000] text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
+            >
+              {isGeneratingSummary ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <BarChart2 size={14} />
+              )}
+              {texts.summary}
+            </button>
           </div>
           <div className="inline-flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full">
             <div className="w-1.5 h-1.5 rounded-full bg-[#1A6B3C]" />

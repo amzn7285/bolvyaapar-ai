@@ -11,6 +11,7 @@ interface VoiceButtonProps {
   privateMode: boolean;
   onTransactionSuccess: (details: any) => void;
   onLessonGenerated: (lessonText: string) => void;
+  onSummaryRequested?: () => void;
   compact?: boolean;
 }
 
@@ -19,6 +20,7 @@ export default function VoiceButton({
   privateMode,
   onTransactionSuccess,
   onLessonGenerated,
+  onSummaryRequested,
   compact,
 }: VoiceButtonProps) {
   const [isListening, setIsListening] = useState(false);
@@ -83,6 +85,22 @@ export default function VoiceButton({
 
   const processQuery = async (query: string) => {
     if (!query.trim()) return;
+
+    // Check for summary commands
+    const queryLower = query.toLowerCase();
+    if (onSummaryRequested && (
+      queryLower.includes("hisaab") || 
+      queryLower.includes("hisab") || 
+      queryLower.includes("summary") || 
+      queryLower.includes("closing") || 
+      queryLower.includes("सारांश")
+    )) {
+      onSummaryRequested();
+      setTextQuery("");
+      setShowTextInput(false);
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const systemPrompt = `You are BolVyapar AI, a shop assistant for Indian kirana stores. 
