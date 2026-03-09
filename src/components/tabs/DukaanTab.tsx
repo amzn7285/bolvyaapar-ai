@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Eye, TrendingUp, BarChart2, Loader2, Share2 } from "lucide-react";
+import { Eye, TrendingUp, BarChart2, Loader2, Share2, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 
@@ -13,11 +13,12 @@ interface DukaanTabProps {
   language: "hi-IN" | "en-IN";
   sales: any[];
   profile: any;
+  totalOutstanding: number;
   onGenerateSummary: () => void;
   isGeneratingSummary?: boolean;
 }
 
-export default function DukaanTab({ privateMode, language, sales, profile, onGenerateSummary, isGeneratingSummary }: DukaanTabProps) {
+export default function DukaanTab({ privateMode, language, sales, profile, totalOutstanding, onGenerateSummary, isGeneratingSummary }: DukaanTabProps) {
   const [revealedSales, setRevealedSales] = useState<Set<number>>(new Set());
   
   const today = new Date().toDateString();
@@ -25,46 +26,48 @@ export default function DukaanTab({ privateMode, language, sales, profile, onGen
   const totalAmount = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
   const count = todaySales.length;
 
-  const itemCounts: Record<string, number> = {};
-  todaySales.forEach(s => {
-    itemCounts[s.item] = (itemCounts[s.item] || 0) + 1;
-  });
-  const bestItem = Object.entries(itemCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "None";
-
   const texts = {
     "hi-IN": {
       todaySales: "आज की बिक्री",
       recentSales: "हाल की बिक्री",
+      outstanding: "उधार बाकी (Outstanding)",
       txns: "लेन-देन",
       tapToReveal: "कीमत देखने के लिए टैप करें",
       empty: "कोई बिक्री नहीं",
       summary: "आज का हिसाब",
-      share: "WhatsApp रिपोर्ट"
+      share: "WhatsApp"
     },
     "en-IN": {
       todaySales: "Today's Sales",
       recentSales: "Recent Sales",
+      outstanding: "Total Outstanding",
       txns: "txns",
-      tapToReveal: "Tap sale to reveal privately",
+      tapToReveal: "Tap to reveal",
       empty: "No sales yet",
-      summary: "Today's Summary",
-      share: "Share Report"
+      summary: "Summary",
+      share: "Share"
     }
   }[language];
 
-  const handleShareDailySummary = () => {
-    const shopName = profile?.shopName || "BolVyapar AI Shop";
-    const destPhone = profile?.ownerPhone || "";
-    const message = language === 'hi-IN'
-      ? `📈 *आज का व्यापार सारांश: ${shopName}*\n🗓️ तारीख: ${format(new Date(), 'dd MMM')}\n\n✅ कुल बिक्री: ${count} लेन-देन\n🌟 सबसे ज्यादा बिकने वाला: ${bestItem}\n💡 टिप: ${bestItem} का स्टॉक बनाए रखें।\n\n_BolVyapar AI द्वारा भेजा गया_`
-      : `📈 *Daily Business Summary: ${shopName}*\n🗓️ Date: ${format(new Date(), 'dd MMM')}\n\n✅ Total Sales: ${count} transactions\n🌟 Top Seller: ${bestItem}\n💡 Tip: Keep ${bestItem} stock ready for high demand.\n\n_Sent via BolVyapar AI_`;
-
-    window.open(`https://wa.me/${destPhone}?text=${encodeURIComponent(message)}`, '_blank');
-    toast({ title: "Opening WhatsApp..." });
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Outstanding Balance Banner */}
+      <Card className="bg-amber-50 border-amber-200 rounded-2xl shadow-sm border">
+        <CardContent className="p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-200 flex items-center justify-center text-amber-700">
+              <Wallet size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">{texts.outstanding}</p>
+              <p className={cn("text-xl font-black text-amber-900 transition-all", privateMode && "blur-md")}>
+                ₹{totalOutstanding.toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Today's Sales Card */}
       <Card className="bg-[#0D2240] border-none rounded-[24px] overflow-hidden shadow-xl">
         <CardContent className="p-6 relative">
@@ -88,14 +91,6 @@ export default function DukaanTab({ privateMode, language, sales, profile, onGen
                 {isGeneratingSummary ? <Loader2 size={14} className="animate-spin" /> : <BarChart2 size={14} />}
                 {texts.summary}
               </button>
-              <button 
-                onClick={handleShareDailySummary}
-                disabled={count === 0}
-                className="flex items-center gap-2 px-3 py-2 bg-[#1A6B3C] text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg active:scale-95 transition-all disabled:opacity-50"
-              >
-                <Share2 size={14} />
-                {texts.share}
-              </button>
             </div>
           </div>
           <div className="inline-flex items-center gap-2 bg-white/5 px-3 py-1 rounded-full">
@@ -106,51 +101,42 @@ export default function DukaanTab({ privateMode, language, sales, profile, onGen
       </Card>
 
       {/* Recent Sales List */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="px-1 flex justify-between items-baseline">
           <h3 className="text-slate-900 text-lg font-black tracking-tight">{texts.recentSales}</h3>
-          <p className="text-[10px] text-slate-400 font-bold uppercase">{texts.tapToReveal}</p>
         </div>
         
-        <div className="space-y-3">
+        <div className="space-y-2">
           {sales.length === 0 ? (
             <div className="text-center py-12 opacity-40">
               <span className="text-4xl block mb-2">📋</span>
               <p className="text-sm font-bold">{texts.empty}</p>
             </div>
           ) : (
-            sales.map((sale) => (
+            sales.slice(0, 10).map((sale) => (
               <div 
                 key={sale.id} 
-                onClick={() => {
-                  setRevealedSales(prev => {
-                    const next = new Set(prev);
-                    next.has(sale.id) ? next.delete(sale.id) : next.add(sale.id);
-                    return next;
-                  });
-                }}
-                className="bg-white border border-slate-100 p-4 rounded-2xl flex items-center justify-between shadow-sm active:bg-slate-50 transition-all cursor-pointer"
+                onClick={() => setRevealedSales(prev => {
+                  const n = new Set(prev);
+                  n.has(sale.id) ? n.delete(sale.id) : n.add(sale.id);
+                  return n;
+                })}
+                className="bg-white border border-slate-100 p-3 rounded-xl flex items-center justify-between shadow-sm active:bg-slate-50 transition-all"
               >
-                <div className="flex gap-4 items-center">
-                  <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-2xl">
-                    {sale.item.toLowerCase().includes('milk') || sale.item.toLowerCase().includes('दूध') ? '🥛' : 
-                     sale.item.toLowerCase().includes('grain') || sale.item.toLowerCase().includes('अनाज') ? '🌾' : 
-                     sale.item.toLowerCase().includes('soap') || sale.item.toLowerCase().includes('साबुन') ? '🧼' : '🛍️'}
-                  </div>
+                <div className="flex gap-3 items-center">
+                  <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-xl">🛍️</div>
                   <div>
                     <h4 className="font-bold text-sm text-slate-800">{sale.item}</h4>
-                    <p className="text-[11px] text-slate-400 font-medium">
-                      {sale.qty} • {sale.customer} • {format(new Date(sale.timestamp), 'h:mm a')}
+                    <p className="text-[10px] text-slate-400 font-medium uppercase">
+                      {sale.qty} • {sale.customer}
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end">
+                <div className="text-right">
                   {revealedSales.has(sale.id) ? (
-                    <span className="text-[22px] font-black text-[#C45000] animate-in zoom-in-95">₹{sale.amount}</span>
+                    <span className="text-lg font-black text-[#C45000]">₹{sale.amount}</span>
                   ) : (
-                    <div className="flex items-center gap-2 h-10 px-4 bg-slate-50 rounded-xl text-[10px] font-bold uppercase text-slate-400 border border-slate-100">
-                      <Eye size={14} /> Reveal
-                    </div>
+                    <div className="text-[10px] font-bold text-slate-300 flex items-center gap-1"><Eye size={12} /> {texts.tapToReveal}</div>
                   )}
                 </div>
               </div>

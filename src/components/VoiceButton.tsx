@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -33,9 +34,7 @@ export default function VoiceButton({
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const SpeechRecognition =
-        (window as any).SpeechRecognition ||
-        (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
         recognition.lang = language;
@@ -45,10 +44,7 @@ export default function VoiceButton({
           const query = e.results[0][0].transcript;
           processQuery(query);
         };
-        recognition.onerror = (e: any) => {
-          console.error("Speech error:", e.error);
-          setIsListening(false);
-        };
+        recognition.onerror = () => setIsListening(false);
         recognition.onend = () => setIsListening(false);
         recognitionRef.current = recognition;
       } else {
@@ -62,7 +58,6 @@ export default function VoiceButton({
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = language;
-    utterance.rate = 0.95;
     window.speechSynthesis.speak(utterance);
   };
 
@@ -84,109 +79,54 @@ export default function VoiceButton({
   const processQuery = async (query: string) => {
     if (!query.trim()) return;
 
-    const queryLower = query.toLowerCase();
-    if (onSummaryRequested && (
-      queryLower.includes("hisaab") || 
-      queryLower.includes("hisab") || 
-      queryLower.includes("summary") || 
-      queryLower.includes("सारांश")
-    )) {
-      onSummaryRequested();
-      setTextQuery("");
-      setShowTextInput(false);
-      return;
-    }
-
     setIsProcessing(true);
     try {
-      // Create a context summary of recent sales for the AI
-      const recentCustomers = salesHistory.slice(0, 50).reduce((acc: any, sale: any) => {
-        if (sale.customer && sale.customer !== 'ग्राहक' && sale.customer !== 'Customer') {
-          acc[sale.customer] = (acc[sale.customer] || 0) + 1;
-        }
-        return acc;
-      }, {});
-
-      const customerContext = Object.entries(recentCustomers)
-        .map(([name, count]) => `${name}: visited ${count} times`)
-        .join(', ');
-
       const systemPrompt = `You are BolVyapar AI. Parse voice input.
-CUSTOMER MEMORY:
-Recent History: ${customerContext || 'No history yet.'}
-If input contains a name, include one fun fact about them in 'spokenResponse' (e.g., "Ramesh today is your 3rd visit this week!").
-Return ONLY raw JSON:
-{
-  "spokenResponse": "1-2 sentence warm confirmation including customer fact if name found, in ${language === 'hi-IN' ? 'Hindi' : 'English'}",
-  "productName": "Item or Expense name",
-  "quantity": number,
-  "unit": "kg/L/units/etc",
-  "customerName": "Name or 'Customer'",
-  "price": number,
-  "isExpense": boolean,
-  "lessonText": "1-sentence business insight"
-}
-Privacy: NEVER speak revenue/profit in 'spokenResponse'.
-Determine 'isExpense' true if user says 'kharcha', 'spent', 'expense', 'bill bhara', etc.
-Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
+      INTENTS:
+      1. Sale: Item sold.
+      2. Expense: Shop expense (kharcha).
+      3. Credit (Udhar): Customer takes credit. Example: "Ramesh ko 200 ka udhar diya".
+      4. Payment (Jama): Customer pays back. Example: "Ramesh ne 150 diya".
+      
+      Return ONLY raw JSON:
+      {
+        "spokenResponse": "1-sentence confirmation in ${language === 'hi-IN' ? 'Hindi' : 'English'}",
+        "productName": "Item name or note",
+        "quantity": number,
+        "unit": "kg/L/etc",
+        "customerName": "Name or 'Customer'",
+        "price": number,
+        "isExpense": boolean,
+        "isCredit": boolean,
+        "isPayment": boolean,
+        "lessonText": "1-sentence business insight"
+      }
+      Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
 
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userMessage: query,
-          systemPrompt: systemPrompt,
-        }),
+        body: JSON.stringify({ userMessage: query, systemPrompt }),
       });
 
       const data = await response.json();
       const rawReply = data.reply || "";
-      
-      let parsed = {
-        spokenResponse: language === "hi-IN" ? "दर्ज हो गया!" : "Recorded!",
-        productName: query,
-        quantity: 1,
-        unit: "unit",
-        customerName: language === "hi-IN" ? "ग्राहक" : "Customer",
-        price: 0,
-        isExpense: false,
-        lessonText: language === "hi-IN" ? "अपना व्यापार बढ़ाते रहें!" : "Keep growing!"
-      };
-
-      try {
-        const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const extracted = JSON.parse(jsonMatch[0]);
-          parsed = { ...parsed, ...extracted };
-        }
-      } catch (e) {
-        console.warn("AI JSON parse error", e);
+      const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        speak(parsed.spokenResponse);
+        onTransactionSuccess(parsed);
+        onLessonGenerated(parsed.lessonText);
       }
-
-      speak(parsed.spokenResponse);
-      onTransactionSuccess({ 
-        productName: parsed.productName, 
-        price: parsed.price,
-        quantity: parsed.quantity,
-        unit: parsed.unit,
-        customerName: parsed.customerName,
-        isExpense: parsed.isExpense
-      });
-      onLessonGenerated(parsed.lessonText);
 
       setTextQuery("");
       setShowTextInput(false);
     } catch (err) {
-      console.error("Voice AI Error:", err);
+      console.error(err);
       speak(language === "hi-IN" ? "गड़बड़ हो गई।" : "Error occurred.");
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const handleTextSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    processQuery(textQuery);
   };
 
   if (showTextInput) {
@@ -194,25 +134,11 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
       <div className="fixed inset-x-0 bottom-24 px-4 z-[70] animate-in slide-in-from-bottom-4">
         <div className="bg-white border border-slate-200 p-4 rounded-[24px] shadow-2xl space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-[10px] font-black text-[#C45000] uppercase tracking-[0.2em]">
-              {language === "hi-IN" ? "लिख कर बताएं" : "Type Command"}
-            </h3>
+            <h3 className="text-[10px] font-black text-[#C45000] uppercase tracking-[0.2em]">{language === "hi-IN" ? "लिख कर बताएं" : "Type Command"}</h3>
             <button onClick={() => setShowTextInput(false)} className="text-slate-400 p-2"><X size={20} /></button>
           </div>
-          <Input
-            value={textQuery}
-            onChange={(e) => setTextQuery(e.target.value)}
-            placeholder={language === "hi-IN" ? "जैसे: 500 का खर्चा हुआ..." : "e.g. Spent 500..."}
-            className="h-16 text-sm border-slate-100 rounded-2xl bg-slate-50"
-            autoFocus
-          />
-          <Button
-            onClick={handleTextSubmit}
-            disabled={isProcessing || !textQuery.trim()}
-            className="w-full h-16 rounded-2xl bg-[#C45000] text-white font-bold"
-          >
-            {isProcessing ? <Loader2 className="animate-spin" /> : <><Send size={20} className="mr-2" />{language === "hi-IN" ? "भेजें" : "Send"}</>}
-          </Button>
+          <Input value={textQuery} onChange={(e) => setTextQuery(e.target.value)} placeholder={language === "hi-IN" ? "जैसे: रमेश को 200 का उधार दिया..." : "e.g. Give 200 credit to Ramesh..."} className="h-14 text-sm rounded-2xl bg-slate-50 border-slate-100" />
+          <Button onClick={() => processQuery(textQuery)} disabled={isProcessing || !textQuery.trim()} className="w-full h-14 rounded-2xl bg-[#C45000] text-white font-bold">{isProcessing ? <Loader2 className="animate-spin" /> : "Send"}</Button>
         </div>
       </div>
     );
@@ -221,28 +147,13 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}.`;
   return (
     <div className="flex flex-col items-center">
       <div className="flex items-center gap-4">
-        <button
-          onClick={startListening}
-          disabled={isProcessing}
-          className={cn(
-            "h-20 w-20 rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(196,80,0,0.3)] transition-all active:scale-90 border-4 border-white",
-            isListening ? "bg-red-500 animate-pulse" : "bg-[#C45000]",
-            isProcessing && "bg-slate-400 cursor-wait"
-          )}
-        >
+        <button onClick={startListening} disabled={isProcessing} className={cn("h-20 w-20 rounded-full flex items-center justify-center shadow-[0_10px_30px_rgba(196,80,0,0.3)] transition-all active:scale-90 border-4 border-white", isListening ? "bg-red-500 animate-pulse" : "bg-[#C45000]", isProcessing && "bg-slate-400")}>
           {isProcessing ? <Loader2 className="text-white animate-spin" size={32} /> : <Mic className="text-white" size={32} />}
         </button>
-
-        <button
-          onClick={() => setShowTextInput(true)}
-          className="h-12 w-12 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center text-slate-400 shadow-sm hover:text-[#C45000] transition-colors"
-        >
-          <Keyboard size={20} />
-        </button>
+        <button onClick={() => setShowTextInput(true)} className="h-12 w-12 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center text-slate-400 shadow-sm"><Keyboard size={20} /></button>
       </div>
-
       <p className="mt-2 text-[10px] font-black text-[#C45000] uppercase tracking-tighter">
-        {isListening ? (language === "hi-IN" ? "सुन रहा हूँ..." : "Listening...") : (language === "hi-IN" ? "बोलिए" : "Tap to Speak")}
+        {isListening ? "सुन रहा हूँ..." : "बोलिए"}
       </p>
     </div>
   );

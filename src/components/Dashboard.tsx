@@ -3,12 +3,12 @@
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Home, Package, BarChart3, Settings, Lock, Users, Eye, EyeOff, Volume2, X } from "lucide-react";
+import { Home, Package, BarChart3, Settings, Lock, BookOpen, Eye, EyeOff, Volume2, X } from "lucide-react";
 import DukaanTab from "./tabs/DukaanTab";
 import StockTab from "./tabs/StockTab";
 import ReportTab from "./tabs/ReportTab";
 import SettingsTab from "./tabs/SettingsTab";
-import CustomerView from "./CustomerView";
+import CreditKhataTab from "./tabs/CreditKhataTab";
 import VoiceButton from "./VoiceButton";
 import { cn } from "@/lib/utils";
 
@@ -21,8 +21,8 @@ interface DashboardProps {
 const SALES_STORAGE_KEY = "bolvyapar_sales_history";
 const EXPENSES_STORAGE_KEY = "bolvyapar_expenses_history";
 const STOCK_STORAGE_KEY = "bolvyapar_stock_data";
+const CREDIT_KHATA_KEY = "bolvyapar_credit_khata";
 const PROFILE_KEY = "bolvyapar_profile";
-const SNOOZE_DURATION = 3600000;
 
 const DEFAULT_STOCK = [
   { id: 'grains', emoji: '🌾', name: 'Grains', hiName: 'अनाज', qty: 100, unit: 'kg', level: 100, maxQty: 100, lowStockLevel: 20 },
@@ -33,12 +33,11 @@ const DEFAULT_STOCK = [
 export default function Dashboard({ role, language, onLogout }: DashboardProps) {
   const [activeTab, setActiveTab] = useState("dukaan");
   const [privateMode, setPrivateMode] = useState(false);
-  const [showCustomerView, setShowCustomerView] = useState(false);
   const [sales, setSales] = useState<any[]>([]);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [stock, setStock] = useState<any[]>(DEFAULT_STOCK);
+  const [creditKhata, setCreditKhata] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
-  const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [currentLesson, setCurrentLesson] = useState<string | null>(null);
   const [showLessonCard, setShowLessonCard] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
@@ -59,6 +58,11 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       try { setStock(JSON.parse(savedStock)); } catch (e) { console.error(e); }
     }
 
+    const savedKhata = localStorage.getItem(CREDIT_KHATA_KEY);
+    if (savedKhata) {
+      try { setCreditKhata(JSON.parse(savedKhata)); } catch (e) { console.error(e); }
+    }
+
     const savedProfile = localStorage.getItem(PROFILE_KEY);
     if (savedProfile) {
       try { setProfile(JSON.parse(savedProfile)); } catch (e) { console.error(e); }
@@ -68,6 +72,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const handleTransaction = (details: any) => {
     const timestamp = new Date().toISOString();
     
+    // 1. Handle Expenses
     if (details.isExpense) {
       const newExpense = {
         id: Date.now(),
@@ -81,6 +86,34 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       return;
     }
 
+    // 2. Handle Credit (Udhar)
+    if (details.isCredit) {
+      const updatedKhata = creditKhata.map(c => {
+        if (c.name.toLowerCase() === details.customerName?.toLowerCase()) {
+          const entry = { id: Date.now(), timestamp, type: 'credit', amount: details.price || 0, note: details.productName || '' };
+          return { ...c, balance: (c.balance || 0) + (details.price || 0), history: [entry, ...(c.history || [])] };
+        }
+        return c;
+      });
+      setCreditKhata(updatedKhata);
+      localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(updatedKhata));
+    }
+
+    // 3. Handle Payment (Jama)
+    if (details.isPayment) {
+      const updatedKhata = creditKhata.map(c => {
+        if (c.name.toLowerCase() === details.customerName?.toLowerCase()) {
+          const entry = { id: Date.now(), timestamp, type: 'payment', amount: details.price || 0, note: 'Received payment' };
+          return { ...c, balance: Math.max(0, (c.balance || 0) - (details.price || 0)), history: [entry, ...(c.history || [])] };
+        }
+        return c;
+      });
+      setCreditKhata(updatedKhata);
+      localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(updatedKhata));
+      return; // Payment isn't a "sale" of goods
+    }
+
+    // 4. Handle Normal Sales
     const newSale = {
       id: Date.now(),
       timestamp,
@@ -92,7 +125,6 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
 
     const updatedSales = [newSale, ...sales];
     setSales(updatedSales);
-    setLastTransaction(details);
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(updatedSales));
 
     // Update Stock Logic
@@ -125,98 +157,48 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     localStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(updatedStock));
   };
 
+  const handleUpdateKhata = (newKhata: any[]) => {
+    setCreditKhata(newKhata);
+    localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(newKhata));
+  };
+
   const handleDailySummary = async () => {
     if (isGeneratingSummary) return;
     setIsGeneratingSummary(true);
 
     const today = new Date().toDateString();
     const todaySales = sales.filter(s => new Date(s.timestamp).toDateString() === today);
-    const todayExpenses = expenses.filter(e => new Date(e.timestamp).toDateString() === today);
-    
     const totalSales = todaySales.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-    const totalExp = todayExpenses.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-    const count = todaySales.length;
     
-    const itemCounts: Record<string, number> = {};
-    todaySales.forEach(s => {
-      itemCounts[s.item] = (itemCounts[s.item] || 0) + 1;
-    });
-    const bestItem = Object.entries(itemCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "None";
-
-    const systemPrompt = `You are BolVyapar AI. Generate a 2-3 sentence spoken summary of today's business. 
-Total Sales: ₹${totalSales}, Transactions: ${count}, Best Seller: ${bestItem}, Total Expenses: ₹${totalExp}.
-Include: Warm greeting, total revenue, transaction count, best product, total expenses, and 1 short tip.
-CRITICAL: NEVER mention Net Profit or exact profit margins aloud.
-Keep it under 30 seconds.
-Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. Respond ONLY with the summary text.`;
+    const systemPrompt = `Generate a 2-sentence summary of today's business. Total Sales: ₹${totalSales}. 
+    Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. NO Net Profit details.`;
 
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userMessage: "Give me today's business summary.",
-          systemPrompt: systemPrompt,
-        }),
+        body: JSON.stringify({ userMessage: "Today's summary", systemPrompt }),
       });
-
       const data = await response.json();
       const text = data.reply || "";
-      
       if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = language;
         window.speechSynthesis.speak(utterance);
       }
     } catch (err) {
-      console.error("Summary error:", err);
+      console.error(err);
     } finally {
       setIsGeneratingSummary(false);
     }
   };
 
-  const handleUpdateProfile = (newProfile: any) => {
-    setProfile(newProfile);
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(newProfile));
-  };
-
-  const handleAddCategory = (newCategory: any) => {
-    const updatedStock = [...stock, {
-      ...newCategory,
-      id: `cat-${Date.now()}`,
-      level: 100,
-      maxQty: newCategory.qty
-    }];
-    setStock(updatedStock);
-    localStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(updatedStock));
-  };
-
-  const handleLessonGenerated = (lesson: string) => {
-    setCurrentLesson(lesson);
-    setTimeout(() => setShowLessonCard(true), 3000);
-  };
-
-  const speakLesson = (text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = language;
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const redItemsCount = stock.filter(item => {
-    const warning = item.lowStockLevel || 10;
-    return item.qty < (warning * 0.15);
-  }).length;
-
-  if (showCustomerView) {
-    return <CustomerView transaction={lastTransaction} onBack={() => setShowCustomerView(false)} language={language} />;
-  }
+  const totalOutstanding = creditKhata.reduce((acc, curr) => acc + (curr.balance || 0), 0);
+  const redItemsCount = stock.filter(item => item.qty < ((item.lowStockLevel || 10) * 0.15)).length;
 
   const texts = {
-    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", report: "रिपोर्ट", settings: "सेटिंग्स" },
-    "en-IN": { dukaan: "Dukaan", stock: "Stock", report: "Report", settings: "Settings" }
+    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", khata: "खाता", report: "रिपोर्ट", settings: "सेटिंग्स" },
+    "en-IN": { dukaan: "Home", stock: "Stock", khata: "Khata", report: "Report", settings: "Settings" }
   }[language];
 
   return (
@@ -228,11 +210,6 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. Respond ONLY with the s
             <span className="text-[#1A6B3C]">Vyapar</span>
             <span className="text-[#FFB300] ml-1 text-[10px] font-bold">AI 🇮🇳</span>
           </div>
-          {profile?.shopName && (
-            <span className="text-[10px] text-white/40 font-bold uppercase truncate max-w-[100px] border-l border-white/10 pl-2 ml-1">
-              {profile.shopName}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-3">
           <button 
@@ -244,16 +221,7 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. Respond ONLY with the s
           >
             {privateMode ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
-          <button 
-            onClick={() => setShowCustomerView(true)}
-            className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40"
-          >
-            <Users size={18} />
-          </button>
-          <button 
-            onClick={onLogout}
-            className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40"
-          >
+          <button onClick={onLogout} className="h-10 w-10 flex items-center justify-center rounded-xl bg-white/5 text-white/40">
             <Lock size={18} />
           </button>
         </div>
@@ -267,42 +235,34 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. Respond ONLY with the s
               language={language} 
               sales={sales} 
               profile={profile}
+              totalOutstanding={totalOutstanding}
               onGenerateSummary={handleDailySummary}
               isGeneratingSummary={isGeneratingSummary}
             />
           </TabsContent>
           <TabsContent value="stock" className="m-0 p-4">
-            <StockTab language={language} stock={stock} onAddCategory={handleAddCategory} sales={sales} profile={profile} />
+            <StockTab language={language} stock={stock} onAddCategory={(cat) => setStock([...stock, {...cat, id: Date.now(), level: 100, maxQty: cat.qty}])} sales={sales} profile={profile} />
+          </TabsContent>
+          <TabsContent value="khata" className="m-0 p-4">
+            <CreditKhataTab language={language} customers={creditKhata} onUpdateCustomers={handleUpdateKhata} profile={profile} />
           </TabsContent>
           <TabsContent value="report" className="m-0 p-4">
             <ReportTab role={role} privateMode={privateMode} language={language} sales={sales} expenses={expenses} profile={profile} />
           </TabsContent>
           <TabsContent value="settings" className="m-0 p-4">
-            <SettingsTab language={language} profile={profile} onUpdateProfile={handleUpdateProfile} />
+            <SettingsTab language={language} profile={profile} onUpdateProfile={(p) => setProfile(p)} />
           </TabsContent>
         </Tabs>
       </main>
 
-      {showLessonCard && !privateMode && !showCustomerView && currentLesson && (
+      {showLessonCard && !privateMode && currentLesson && (
         <div className="fixed bottom-28 left-4 right-4 bg-white border border-slate-200 rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom-full duration-500 z-50 flex items-center gap-4">
           <div className="text-3xl">📚</div>
-          <div className="flex-1 space-y-3">
-            <p className="text-[10px] font-black text-[#C45000] uppercase tracking-widest">New Lesson</p>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => { speakLesson(currentLesson!); setShowLessonCard(false); }}
-                className="bg-[#1A6B3C] text-white h-12 flex-1 rounded-xl flex items-center justify-center gap-2 font-bold text-sm"
-              >
-                <Volume2 size={16} /> Suniye
-              </button>
-              <button 
-                onClick={() => setShowLessonCard(false)}
-                className="bg-slate-100 text-slate-500 h-12 w-12 rounded-xl flex items-center justify-center"
-              >
-                <X size={18} />
-              </button>
-            </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-black text-[#C45000] uppercase tracking-widest">Insight</p>
+            <p className="text-sm font-bold">{currentLesson}</p>
           </div>
+          <button onClick={() => setShowLessonCard(false)} className="text-slate-400 p-2"><X size={20} /></button>
         </div>
       )}
 
@@ -322,15 +282,15 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. Respond ONLY with the s
               language={language} 
               privateMode={privateMode} 
               onTransactionSuccess={handleTransaction} 
-              onLessonGenerated={handleLessonGenerated}
+              onLessonGenerated={(l) => { setCurrentLesson(l); setShowLessonCard(true); }}
               onSummaryRequested={handleDailySummary}
               salesHistory={sales}
               compact
             />
           </div>
 
+          <NavBtn icon={<BookOpen size={22} />} label={texts.khata} active={activeTab === 'khata'} onClick={() => setActiveTab('khata')} />
           <NavBtn icon={<BarChart3 size={22} />} label={texts.report} active={activeTab === 'report'} onClick={() => setActiveTab('report')} disabled={role === 'helper'} />
-          <NavBtn icon={<Settings size={22} />} label={texts.settings} active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
         </div>
       </nav>
     </div>
@@ -339,15 +299,7 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. Respond ONLY with the s
 
 function NavBtn({ icon, label, active, onClick, disabled, badge }: { icon: any, label: string, active: boolean, onClick: () => void, disabled?: boolean, badge?: number }) {
   return (
-    <button 
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "flex flex-col items-center gap-1 min-w-[64px] transition-all relative",
-        active ? "text-[#C45000]" : "text-slate-400",
-        disabled && "opacity-20"
-      )}
-    >
+    <button onClick={onClick} disabled={disabled} className={cn("flex flex-col items-center gap-1 min-w-[56px] transition-all relative", active ? "text-[#C45000]" : "text-slate-400", disabled && "opacity-20")}>
       <div className={cn("transition-transform", active && "scale-110")}>
         {icon}
         {badge !== undefined && (
