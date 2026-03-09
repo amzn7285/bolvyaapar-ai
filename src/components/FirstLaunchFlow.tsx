@@ -41,6 +41,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
   });
 
   const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef(""); // Use a ref to capture the latest transcript in onend
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -54,16 +55,21 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
           setIsListening(true);
           setMicError(false);
           setTranscript("");
+          transcriptRef.current = "";
         };
 
         recognition.onresult = (e: any) => {
           const current = e.results[0][0].transcript;
           setTranscript(current);
+          transcriptRef.current = current;
         };
 
         recognition.onend = () => {
           setIsListening(false);
-          // If transcript exists, it will be handled by the button or auto-save logic if added
+          // Automatically save when speaking ends
+          if (transcriptRef.current) {
+            handleVoiceAction(transcriptRef.current);
+          }
         };
 
         recognition.onerror = (event: any) => {
@@ -78,7 +84,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
         setMicError(true);
       }
     }
-  }, [language]);
+  }, [language, step]); // Re-bind when step changes to ensure correct system prompt context
 
   const speak = (text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -90,10 +96,10 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
   const startListening = () => {
     if (isListening) {
       recognitionRef.current?.stop();
-      if (transcript) handleVoiceAction(transcript);
       return;
     }
     setTranscript("");
+    transcriptRef.current = "";
     try {
       recognitionRef.current?.start();
     } catch (e) {
@@ -102,7 +108,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
   };
 
   const handleVoiceAction = async (query: string) => {
-    if (!query.trim()) return;
+    if (!query.trim() || isProcessing) return;
     setIsProcessing(true);
     try {
       let systemPrompt = "";
@@ -124,18 +130,19 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
         const parsed = JSON.parse(jsonMatch[0]);
         if (step === 3) {
           setFormData(prev => ({ ...prev, firstStock: parsed }));
-          speak(language === 'hi-IN' ? "जोड़ दिया गया है" : "Stock added");
+          speak(language === 'hi-IN' ? "स्टॉक जोड़ दिया गया है" : "Stock added");
         } else if (step === 4) {
           setFormData(prev => ({ ...prev, firstSale: parsed }));
           speak(language === 'hi-IN' ? "बिक्री दर्ज हो गई" : "Sale recorded");
         }
-        setManualInput(""); // Clear manual input only on success
+        setManualInput("");
       }
     } catch (e) {
       console.error(e);
     } finally {
       setIsProcessing(false);
       setTranscript("");
+      transcriptRef.current = "";
     }
   };
 
@@ -222,6 +229,8 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
     }
   }[language];
 
+  const currentSavedItem = step === 3 ? formData.firstStock : formData.firstSale;
+
   return (
     <div className="fixed inset-0 bg-[#0D2240] z-[100] flex flex-col p-6 overflow-y-auto">
       <div className="max-w-md mx-auto w-full flex-1 flex flex-col justify-center space-y-8 py-12">
@@ -284,11 +293,11 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
                   className={cn(
                     "h-32 w-32 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90", 
                     isListening ? "bg-red-500 animate-pulse" : "bg-[#C45000]",
-                    (step === 3 ? formData.firstStock : formData.firstSale) && "ring-4 ring-emerald-500"
+                    currentSavedItem && "ring-4 ring-emerald-500"
                   )}
                 >
                   {isProcessing ? <Loader2 className="text-white animate-spin" size={48} /> : 
-                   (step === 3 ? formData.firstStock : formData.firstSale) ? <CheckCircle2 className="text-white" size={48} /> : <Mic className="text-white" size={48} />}
+                   currentSavedItem ? <CheckCircle2 className="text-white" size={48} /> : <Mic className="text-white" size={48} />}
                 </button>
                 {isListening && (
                   <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 w-64 text-center">
@@ -322,24 +331,24 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
                 )}
               </div>
 
-              {/* Saved Item Card */}
-              {(step === 3 ? formData.firstStock : formData.firstSale) && (
+              {/* Persistent Saved Item Card */}
+              {currentSavedItem && (
                 <div className="w-full bg-white/5 border border-emerald-500/30 p-6 rounded-[32px] flex items-center justify-between animate-in zoom-in-95">
                   <div className="flex items-center gap-4">
                     <div className="h-14 w-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center text-3xl">
-                      {step === 3 ? (formData.firstStock.emoji || <Package className="text-emerald-400" />) : <ShoppingBag className="text-emerald-400" />}
+                      {step === 3 ? (currentSavedItem.emoji || <Package className="text-emerald-400" />) : <ShoppingBag className="text-emerald-400" />}
                     </div>
                     <div>
                       <p className="text-emerald-400 font-black text-[10px] uppercase tracking-widest flex items-center gap-1">
                         <CheckCircle2 size={12} /> {texts.saved}
                       </p>
                       <h4 className="text-xl font-black text-white">
-                        {step === 3 ? formData.firstStock.name : formData.firstSale.productName}
+                        {step === 3 ? currentSavedItem.name : currentSavedItem.productName}
                       </h4>
                       <p className="text-white/40 text-sm font-bold">
                         {step === 3 
-                          ? `${formData.firstStock.qty} ${formData.firstStock.unit} ${formData.firstStock.price ? '• ₹' + formData.firstStock.price : ''}`
-                          : `₹${formData.firstSale.price} • ${formData.firstSale.quantity || 1} units`}
+                          ? `${currentSavedItem.qty} ${currentSavedItem.unit} ${currentSavedItem.price ? '• ₹' + currentSavedItem.price : ''}`
+                          : `₹${currentSavedItem.price} • ${currentSavedItem.quantity || 1} units`}
                       </p>
                     </div>
                   </div>
@@ -348,7 +357,6 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
               )}
 
               <Button 
-                disabled={!(step === 3 ? formData.firstStock : formData.firstSale)} 
                 onClick={handleNext} 
                 className="w-full h-16 rounded-2xl bg-[#38BDF8] text-[#0D2240] font-black text-lg shadow-xl shadow-[#38BDF8]/20"
               >
