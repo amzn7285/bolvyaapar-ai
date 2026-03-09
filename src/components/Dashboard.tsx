@@ -256,7 +256,7 @@ Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. Respond ONLY with the s
             />
           </TabsContent>
           <TabsContent value="stock" className="m-0 p-4">
-            <StockTab language={language} stock={stock} onAddCategory={handleAddCategory} />
+            <StockTab language={language} stock={stock} onAddCategory={handleAddCategory} sales={sales} />
           </TabsContent>
           <TabsContent value="report" className="m-0 p-4">
             <ReportTab role={role} privateMode={privateMode} language={language} sales={sales} expenses={expenses} />

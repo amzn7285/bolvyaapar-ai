@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Volume2, Plus, AlertTriangle } from "lucide-react";
+import { Volume2, Plus, AlertTriangle, MessageCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,9 +15,10 @@ interface StockTabProps {
   language: "hi-IN" | "en-IN";
   stock: any[];
   onAddCategory: (category: any) => void;
+  sales: any[];
 }
 
-export default function StockTab({ language, stock, onAddCategory }: StockTabProps) {
+export default function StockTab({ language, stock, onAddCategory, sales }: StockTabProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -38,6 +39,36 @@ export default function StockTab({ language, stock, onAddCategory }: StockTabPro
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = language;
     window.speechSynthesis.speak(utterance);
+  };
+
+  const handleOrderStock = (item: any) => {
+    // Calculate suggested quantity based on last 7 days sales
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const relevantSales = sales.filter(s => {
+      const saleDate = new Date(s.timestamp);
+      const prodName = (s.item || "").toLowerCase();
+      const itemName = item.name.toLowerCase();
+      const itemHiName = (item.hiName || "").toLowerCase();
+      const isMatch = prodName.includes(itemName) || prodName.includes(itemHiName);
+      return saleDate >= sevenDaysAgo && isMatch;
+    });
+
+    const weeklyTotal = relevantSales.reduce((acc, curr) => {
+      const qty = parseFloat(curr.qty) || 0;
+      return acc + qty;
+    }, 0);
+
+    const suggestedQty = Math.max(item.maxQty || 100, Math.ceil(weeklyTotal * 1.5));
+    
+    const shopName = "BolVyapar AI";
+    const message = language === 'hi-IN' 
+      ? `नमस्ते! मुझे ${item.hiName || item.name} का स्टॉक चाहिए।\nप्रस्तावित मात्रा: ${suggestedQty} ${item.unit}\nदुकान: ${shopName}`
+      : `Hi! I need to restock ${item.name}.\nSuggested Quantity: ${suggestedQty} ${item.unit}\nShop: ${shopName}`;
+
+    const encodedMsg = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMsg}`, '_blank');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -71,9 +102,7 @@ export default function StockTab({ language, stock, onAddCategory }: StockTabPro
       healthy: "पर्याप्त है",
       formTitle: "नई स्टॉक कैटेगरी",
       save: "सुरक्षित करें",
-      placeholderName: "सामान का नाम (उदा. तेल)",
-      placeholderQty: "मात्रा",
-      placeholderPrice: "कीमत"
+      order: "स्टॉक मंगाएं"
     },
     "en-IN": {
       title: "Inventory Status",
@@ -82,9 +111,7 @@ export default function StockTab({ language, stock, onAddCategory }: StockTabPro
       healthy: "Healthy",
       formTitle: "Add New Category",
       save: "Save Category",
-      placeholderName: "Category Name (e.g. Oil)",
-      placeholderQty: "Quantity",
-      placeholderPrice: "Price"
+      order: "Order Stock"
     }
   }[language];
 
@@ -252,15 +279,25 @@ export default function StockTab({ language, stock, onAddCategory }: StockTabPro
                       </p>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => speakStock(item)}
-                    className={cn(
-                      "h-12 w-12 flex items-center justify-center rounded-2xl",
-                      isRed ? "bg-red-50 text-red-600" : "bg-slate-50 text-[#1A6B3C]"
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => speakStock(item)}
+                      className={cn(
+                        "h-12 w-12 flex items-center justify-center rounded-2xl",
+                        isRed ? "bg-red-50 text-red-600" : "bg-slate-50 text-[#1A6B3C]"
+                      )}
+                    >
+                      <Volume2 size={20} />
+                    </button>
+                    {isRed && (
+                      <button 
+                        onClick={() => handleOrderStock(item)}
+                        className="h-12 px-4 bg-[#1A6B3C] text-white rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest animate-in fade-in slide-in-from-right-2"
+                      >
+                        <MessageCircle size={16} /> {texts.order}
+                      </button>
                     )}
-                  >
-                    <Volume2 size={20} />
-                  </button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Progress 
