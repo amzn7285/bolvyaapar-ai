@@ -1,17 +1,15 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Mic, Loader2, Keyboard, X, Check } from "lucide-react";
+import { Mic, Loader2, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 
 interface VoiceButtonProps {
   role: "owner" | "helper";
   language: "hi-IN" | "en-IN";
   privateMode: boolean;
   onTransactionSuccess: (details: any) => void;
-  onSummaryRequested?: () => void;
   businessType?: string;
   stock?: any[];
   khata?: any[];
@@ -23,13 +21,10 @@ const MAPPINGS_KEY = "bolvyapar_product_mappings";
 export default function VoiceButton({ role, language, privateMode, onTransactionSuccess, businessType = "kirana", stock = [], khata = [], compact }: VoiceButtonProps) {
   const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showTextInput, setShowTextInput] = useState(false);
-  const [textQuery, setTextQuery] = useState("");
   const [learnedMappings, setLearnedMappings] = useState<Record<string, { category: string, count: number }>>({});
   const [pendingTxn, setPendingTxn] = useState<any>(null);
   const [autoConfirmTimer, setAutoConfirmTimer] = useState<number | null>(null);
   const [isAskingClarification, setIsAskingClarification] = useState(false);
-  const [clarificationType, setClarificationType] = useState<'stock' | 'expense' | null>(null);
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
 
   const isHelper = role === "helper";
@@ -75,7 +70,7 @@ export default function VoiceButton({ role, language, privateMode, onTransaction
     setIsProcessing(true);
 
     if (!navigator.onLine) {
-      finalizeTransaction({ spokenResponse: language === "hi-IN" ? "ऑफलाइन सेव" : "Saved Offline", productName: query, price: 0, confidence: 1 });
+      finalizeTransaction({ spokenResponse: language === "hi-IN" ? "ऑफलाइन सेव" : "Saved Offline", productName: query, price: 0, intent: 'sale' });
       setIsProcessing(false);
       return;
     }
@@ -83,7 +78,20 @@ export default function VoiceButton({ role, language, privateMode, onTransaction
     try {
       const stockCategories = stock.map(s => s.name).join(", ");
       const khataNames = khata.map(c => c.name).join(", ");
-      const systemPrompt = `Parse voice. Intent: Sale, Expense, Credit, Payment. Context: ${businessType}. Stock: ${stockCategories}. Khata: ${khataNames}. Return ONLY JSON.`;
+      const systemPrompt = `Parse voice. 
+Intents: 
+1. sale (Retail sale)
+2. expense (Business kharcha)
+3. credit (Udhaar dena)
+4. payment (Udhaar vapas lena)
+5. job_create (Service job: tailor/repair/etc - e.g. 'Rahul ka mobile liya screen todda hai 500 mein dunga')
+6. job_complete (Mark job ready - e.g. 'Rahul ka kaam ho gaya')
+
+Context: ${businessType}. Stock: ${stockCategories}. Khata: ${khataNames}. 
+For job_create: extract customerName, productName (item being serviced), description (problem), price (total), advance.
+For job_complete: extract customerName.
+
+Return ONLY JSON: {"intent": "...", "spokenResponse": "...", "productName": "...", "customerName": "...", "price": 0, "quantity": 0, "unit": "...", "description": "..."}`;
 
       const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userMessage: query, systemPrompt }) });
       const data = await response.json();
@@ -97,24 +105,27 @@ export default function VoiceButton({ role, language, privateMode, onTransaction
   };
 
   const handleTransactionResult = (txn: any) => {
-    if (isHelper && (txn.isExpense || txn.isCredit || txn.isPayment)) {
+    if (isHelper && (txn.intent === 'expense' || txn.intent === 'credit' || txn.intent === 'payment' || txn.intent === 'job_create')) {
       speak(language === "hi-IN" ? "सिर्फ सेल लिखें।" : "Sales only.");
       return;
     }
-    const mapping = learnedMappings[txn.productName?.toLowerCase()];
-    if (mapping?.count >= 3) {
-      txn.matchedCategory = mapping.category;
-      finalizeTransaction(txn);
-    } else if (txn.suggestedCategory && txn.confidence < 0.7) {
-      setPendingTxn(txn);
-      setSuggestedCategory(txn.suggestedCategory);
-      setIsAskingClarification(true);
-      setClarificationType('stock');
-      speak(language === "hi-IN" ? `${txn.productName} ${txn.suggestedCategory} में है?` : `Is ${txn.productName} in ${txn.suggestedCategory}?`);
-      setTimeout(() => startListening(), 800);
-    } else {
-      finalizeTransaction(txn);
+    
+    // Fuzzy matching learning logic for retail sales
+    if (txn.intent === 'sale') {
+      const mapping = learnedMappings[txn.productName?.toLowerCase()];
+      if (mapping?.count >= 3) {
+        txn.matchedCategory = mapping.category;
+      } else if (txn.suggestedCategory && !txn.matchedCategory) {
+        setPendingTxn(txn);
+        setSuggestedCategory(txn.suggestedCategory);
+        setIsAskingClarification(true);
+        speak(language === "hi-IN" ? `${txn.productName} ${txn.suggestedCategory} में है?` : `Is ${txn.productName} in ${txn.suggestedCategory}?`);
+        setTimeout(() => startListening(), 800);
+        return;
+      }
     }
+
+    finalizeTransaction(txn);
   };
 
   const handleClarificationResponse = (query: string) => {
@@ -126,17 +137,14 @@ export default function VoiceButton({ role, language, privateMode, onTransaction
       setLearnedMappings(updated);
       localStorage.setItem(MAPPINGS_KEY, JSON.stringify(updated));
       pendingTxn.matchedCategory = suggestedCategory;
-      finalizeTransaction(pendingTxn);
-    } else {
-      finalizeTransaction(pendingTxn);
     }
+    finalizeTransaction(pendingTxn);
     setIsAskingClarification(false);
   };
 
   const finalizeTransaction = (txn: any) => {
     setPendingTxn(txn);
     if (navigator.onLine) speak(txn.spokenResponse);
-    // Instant display (within 1s requirement) is handled by React state
     let timeLeft = 5;
     setAutoConfirmTimer(timeLeft);
     const interval = setInterval(() => {
@@ -155,26 +163,37 @@ export default function VoiceButton({ role, language, privateMode, onTransaction
   };
 
   if (pendingTxn && !isAskingClarification) {
+    const isJob = pendingTxn.intent === 'job_create';
+    const isJobComplete = pendingTxn.intent === 'job_complete';
+    
     return (
       <div className="fixed inset-0 z-[150] bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
         <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95">
           <div className="p-8 space-y-8">
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="h-28 w-28 rounded-full bg-slate-50 flex items-center justify-center text-6xl">🛍️</div>
+              <div className="h-28 w-28 rounded-full bg-slate-50 flex items-center justify-center text-6xl">
+                {isJob ? '🛠️' : isJobComplete ? '✅' : '🛍️'}
+              </div>
               <div>
-                <h2 className="text-4xl font-black text-[#0D2240] uppercase tracking-tight">{pendingTxn.productName}</h2>
-                <p className="text-2xl font-black text-slate-400 mt-2">{pendingTxn.quantity} {pendingTxn.unit}</p>
+                <h2 className="text-3xl font-black text-[#0D2240] uppercase tracking-tight">
+                  {isJobComplete ? pendingTxn.customerName : pendingTxn.productName || pendingTxn.customerName}
+                </h2>
+                <p className="text-xl font-black text-slate-400 mt-2">
+                  {isJobComplete ? (language === 'hi-IN' ? 'काम हो गया' : 'Ready') : 
+                   isJob ? (language === 'hi-IN' ? 'नया ऑर्डर' : 'New Order') : 
+                   `${pendingTxn.quantity || ''} ${pendingTxn.unit || ''}`}
+                </p>
               </div>
             </div>
-            {!isHelper && (
-              <div className="text-6xl font-black text-secondary text-center">₹{pendingTxn.price || '---'}</div>
+            {!isHelper && !isJobComplete && pendingTxn.price > 0 && (
+              <div className="text-5xl font-black text-secondary text-center">₹{pendingTxn.price}</div>
             )}
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => setPendingTxn(null)} className="h-20 rounded-[28px] bg-red-50 text-red-600 font-black text-lg uppercase border-2 border-red-100 flex flex-col items-center justify-center">
-                <X size={28} /> <span>Galat</span>
+                <span>Galat</span>
               </button>
               <button onClick={() => confirmTransaction(pendingTxn)} className="h-20 rounded-[28px] bg-secondary text-white font-black text-lg uppercase shadow-xl flex flex-col items-center justify-center">
-                <Check size={28} /> <span>Sahi Hai</span>
+                <span>Sahi Hai</span>
               </button>
             </div>
             <div className="text-center text-[11px] font-black text-slate-300 uppercase tracking-widest">Auto Confirm in {autoConfirmTimer}s</div>

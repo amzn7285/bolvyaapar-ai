@@ -1,13 +1,15 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
-import { Home, Package, BarChart3, Lock, BookOpen, Eye, EyeOff, MessageCircle, X, Sparkles, ShieldAlert, Settings } from "lucide-react";
+import { Home, Package, BarChart3, Lock, BookOpen, Eye, EyeOff, MessageCircle, X, Sparkles, ShieldAlert, Settings, ClipboardList } from "lucide-react";
 import DukaanTab from "./tabs/DukaanTab";
 import StockTab from "./tabs/StockTab";
 import ReportTab from "./tabs/ReportTab";
 import SettingsTab from "./tabs/SettingsTab";
 import CreditKhataTab from "./tabs/CreditKhataTab";
+import OrdersTab from "./tabs/OrdersTab";
 import VoiceButton from "./VoiceButton";
 import ConnectivityBanner from "./ConnectivityBanner";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -23,17 +25,18 @@ const SALES_STORAGE_KEY = "bolvyapar_sales_history";
 const EXPENSES_STORAGE_KEY = "bolvyapar_expenses_history";
 const STOCK_STORAGE_KEY = "bolvyapar_stock_data";
 const CREDIT_KHATA_KEY = "bolvyapar_credit_khata";
+const JOBS_STORAGE_KEY = "bolvyapar_jobs_data";
 const PROFILE_KEY = "bolvyapar_profile";
 
 const BUSINESS_TYPES = [
-  { id: 'kirana', emoji: '🏪', en: "Kirana Store", hi: "किराना स्टोर" },
-  { id: 'dhaba', emoji: '🍵', en: "Dhaba", hi: "ढाबा" },
-  { id: 'tailor', emoji: '✂️', en: "Tailor", hi: "दर्जी" },
-  { id: 'repair', emoji: '🔧', en: "Repair Shop", hi: "रिपेयर शॉप" },
-  { id: 'milk', emoji: '🥛', en: "Milk Delivery", hi: "दूध की डिलीवरी" },
-  { id: 'medical', emoji: '💊', en: "Medical Store", hi: "मेडिकल स्टोर" },
-  { id: 'salon', emoji: '💇', en: "Salon", hi: "सैलून" },
-  { id: 'other', emoji: '📦', en: "Other Biz", hi: "अन्य व्यापार" },
+  { id: 'kirana', emoji: '🏪', en: "Kirana Store", hi: "किराना स्टोर", isService: false },
+  { id: 'dhaba', emoji: '🍵', en: "Dhaba", hi: "ढाबा", isService: false },
+  { id: 'tailor', emoji: '✂️', en: "Tailor", hi: "दर्जी", isService: true },
+  { id: 'repair', emoji: '🔧', en: "Repair Shop", hi: "रिपेयर शॉप", isService: true },
+  { id: 'milk', emoji: '🥛', en: "Milk Delivery", hi: "दूध की डिलीवरी", isService: false },
+  { id: 'medical', emoji: '💊', en: "Medical Store", hi: "मेडिकल स्टोर", isService: false },
+  { id: 'salon', emoji: '💇', en: "Salon", hi: "सैलून", isService: true },
+  { id: 'other', emoji: '📦', en: "Other Biz", hi: "अन्य व्यापार", isService: false },
 ];
 
 export default function Dashboard({ role, language, onLogout }: DashboardProps) {
@@ -43,10 +46,10 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const [expenses, setExpenses] = useState<any[]>([]);
   const [stock, setStock] = useState<any[]>([]);
   const [creditKhata, setCreditKhata] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ show: boolean, text: string, whatsappUrl: string } | null>(null);
-  const [lastTransaction, setLastTransaction] = useState<any>(null);
 
   const isHelper = role === "helper";
 
@@ -64,6 +67,9 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       const savedKhata = localStorage.getItem(CREDIT_KHATA_KEY);
       if (savedKhata) try { setCreditKhata(JSON.parse(savedKhata)); } catch (e) { console.error(e); }
 
+      const savedJobs = localStorage.getItem(JOBS_STORAGE_KEY);
+      if (savedJobs) try { setJobs(JSON.parse(savedJobs)); } catch (e) { console.error(e); }
+
       const savedProfile = localStorage.getItem(PROFILE_KEY);
       if (savedProfile) try { setProfile(JSON.parse(savedProfile)); } catch (e) { console.error(e); }
     };
@@ -72,13 +78,40 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
 
   const handleTransaction = (details: any) => {
     const timestamp = new Date().toISOString();
-    setLastTransaction({ ...details, timestamp });
     
-    if (details.isNewCustomer) {
-      const newEntry = { id: Date.now(), name: details.customerName, phone: details.customerPhone || "", balance: 0, history: [], lastPaymentAt: null };
-      const updated = [...creditKhata, newEntry];
-      setCreditKhata(updated);
-      localStorage.setItem(CREDIT_KHATA_KEY, JSON.stringify(updated));
+    // Handle Job Status Updates
+    if (details.intent === 'job_complete') {
+      const updatedJobs = jobs.map(j => {
+        if (j.customerName?.toLowerCase() === details.customerName?.toLowerCase() && (j.status === 'Received' || j.status === 'In Progress')) {
+          return { ...j, status: 'Ready' };
+        }
+        return j;
+      });
+      setJobs(updatedJobs);
+      localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updatedJobs));
+      
+      const shopName = profile?.shopName || "BolVyapar Shop";
+      const msg = `नमस्ते ${details.customerName}, आपका काम तैयार है — आ जाइये। धन्यवाद! - ${shopName}`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+      return;
+    }
+
+    // Handle New Job Creation
+    if (details.intent === 'job_create') {
+      const newJob = {
+        id: Date.now(),
+        timestamp,
+        customerName: details.customerName,
+        item: details.productName,
+        problem: details.description || details.productName,
+        price: details.price || 0,
+        advance: details.advance || 0,
+        status: 'Received',
+        dueDate: details.dueDate || null
+      };
+      const updatedJobs = [newJob, ...jobs];
+      setJobs(updatedJobs);
+      localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updatedJobs));
       return;
     }
 
@@ -115,23 +148,21 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       return;
     }
 
+    // Default Sale
     const newSale = { id: Date.now(), timestamp, item: details.productName || "Unknown Item", qty: details.quantity ? `${details.quantity} ${details.unit || ''}` : "---", customer: details.customerName || (language === 'hi-IN' ? 'ग्राहक' : 'Customer'), amount: details.price || 0 };
     const updatedSales = [newSale, ...sales];
     setSales(updatedSales);
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(updatedSales));
 
+    // Stock update logic remains same
     const soldQty = Number(details.quantity) || 0;
     const prodName = (details.productName || "").toLowerCase();
     const updatedStock = stock.map(item => {
       let isMatch = false;
-      const itemName = item.name.toLowerCase();
-      const itemHiName = (item.hiName || "").toLowerCase();
-      if (prodName.includes(itemName) || prodName.includes(itemHiName) || details.matchedCategory === item.name) isMatch = true;
+      if (prodName.includes(item.name.toLowerCase()) || prodName.includes((item.hiName || "").toLowerCase()) || details.matchedCategory === item.name) isMatch = true;
       if (isMatch) {
         const newQty = Math.max(0, item.qty - soldQty);
-        const maxQty = item.maxQty || 100;
-        const newLevel = (newQty / maxQty) * 100;
-        return { ...item, qty: newQty, level: newLevel };
+        return { ...item, qty: newQty, level: (newQty / (item.maxQty || 100)) * 100 };
       }
       return item;
     });
@@ -150,7 +181,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     todaySales.forEach(s => { itemMap[s.item] = (itemMap[s.item] || 0) + (parseFloat(s.qty) || 1); });
     const bestSeller = Object.entries(itemMap).sort((a, b) => b[1] - a[1])[0]?.[0] || "---";
 
-    const systemPrompt = `Closing summary. Sales: ${count}. Best: ${bestSeller}. Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. No money totals.`;
+    const systemPrompt = `Closing summary. Sales: ${count}. Best: ${bestSeller}. Language: ${language === 'hi-IN' ? 'Hindi' : 'English'}. No money totals. Business: ${profile?.businessType}`;
 
     try {
       const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userMessage: "Summary", systemPrompt }) });
@@ -175,8 +206,8 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
   const bizInfo = BUSINESS_TYPES.find(b => b.id === profile?.businessType) || BUSINESS_TYPES[0];
 
   const texts = {
-    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", khata: "खाता", report: "रिपोर्ट", helperMode: "हेल्पर मोड - सीमित", share: "WhatsApp पर भेजें" },
-    "en-IN": { dukaan: "Dukaan", stock: "Stock", khata: "Khata", report: "Report", helperMode: "Helper Mode", share: "Share on WhatsApp" }
+    "hi-IN": { dukaan: "दुकान", stock: "स्टॉक", khata: "खाता", report: "रिपोर्ट", activity: bizInfo.isService ? "ऑर्डर" : "हिसाब", share: "WhatsApp पर भेजें" },
+    "en-IN": { dukaan: "Dukaan", stock: "Stock", khata: "Khata", report: "Report", activity: bizInfo.isService ? "Orders" : "History", share: "Share on WhatsApp" }
   }[language];
 
   return (
@@ -186,7 +217,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       {isHelper && (
         <div className="bg-[#C45000] text-white px-4 py-2 flex items-center justify-center gap-2 z-[100] shadow-md">
           <ShieldAlert size={14} className="animate-pulse" />
-          <span className="text-[10px] font-black uppercase tracking-widest">{texts.helperMode}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest">Helper Mode</span>
         </div>
       )}
       
@@ -221,6 +252,15 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
           </TabsContent>
           <TabsContent value="stock" className="m-0 p-4">
             <StockTab role={role} language={language} stock={stock} onAddCategory={(cat) => setStock([...stock, cat])} sales={sales} profile={profile} />
+          </TabsContent>
+          <TabsContent value="activity" className="m-0 p-4">
+            <OrdersTab 
+              language={language} 
+              isService={bizInfo.isService} 
+              jobs={jobs} 
+              sales={sales} 
+              onUpdateJobs={(updated) => { setJobs(updated); localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updated)); }} 
+            />
           </TabsContent>
           {!isHelper && (
             <>
@@ -259,26 +299,24 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
           <NavBtn icon={<Package size={26} />} label={texts.stock} active={activeTab === 'stock'} onClick={() => setActiveTab('stock')} badge={redItemsCount > 0 ? redItemsCount : undefined} />
           
           <div className="relative -top-10 flex flex-col items-center">
-            <VoiceButton role={role} language={language} privateMode={privateMode} onTransactionSuccess={handleTransaction} onSummaryRequested={handleDailySummary} businessType={profile?.businessType} stock={stock} khata={creditKhata} compact />
+            <VoiceButton role={role} language={language} privateMode={privateMode} onTransactionSuccess={handleTransaction} businessType={profile?.businessType} stock={stock} khata={creditKhata} compact />
           </div>
 
-          {!isHelper ? (
-            <>
-              <NavBtn icon={<BookOpen size={26} />} label={texts.khata} active={activeTab === 'khata'} onClick={() => setActiveTab('khata')} />
-              <NavBtn icon={<BarChart3 size={26} />} label={texts.report} active={activeTab === 'report'} onClick={() => setActiveTab('report')} />
-            </>
-          ) : (
-             <div className="w-[56px]" /> // Spacer
+          <NavBtn icon={<ClipboardList size={26} />} label={texts.activity} active={activeTab === 'activity'} onClick={() => setActiveTab('activity')} />
+
+          {!isHelper && (
+            <NavBtn icon={<BarChart3 size={26} />} label={texts.report} active={activeTab === 'report'} onClick={() => setActiveTab('report')} />
           )}
+          {isHelper && <NavBtn icon={<BookOpen size={26} />} label={texts.khata} active={false} onClick={() => {}} className="opacity-0 pointer-events-none" />}
         </div>
       </nav>
     </div>
   );
 }
 
-function NavBtn({ icon, label, active, onClick, badge }: { icon: any, label: string, active: boolean, onClick: () => void, badge?: number }) {
+function NavBtn({ icon, label, active, onClick, badge, className }: { icon: any, label: string, active: boolean, onClick: () => void, badge?: number, className?: string }) {
   return (
-    <button onClick={onClick} className={cn("flex flex-col items-center gap-1.5 min-w-[56px] transition-all relative", active ? "text-[#C45000]" : "text-slate-400")}>
+    <button onClick={onClick} className={cn("flex flex-col items-center gap-1.5 min-w-[56px] transition-all relative", active ? "text-[#C45000]" : "text-slate-400", className)}>
       <div className={cn("transition-transform", active && "scale-110")}>
         {icon}
         {badge !== undefined && <div className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black h-5 w-5 rounded-full flex items-center justify-center ring-2 ring-white">{badge}</div>}
