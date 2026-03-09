@@ -44,7 +44,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitRecognition;
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
         recognition.lang = language;
@@ -62,14 +62,17 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
 
         recognition.onend = () => {
           setIsListening(false);
+          // If we have a transcript, process it automatically when user stops speaking
           if (transcript) {
             handleVoiceAction(transcript);
           }
         };
 
-        recognition.onerror = () => {
+        recognition.onerror = (event: any) => {
           setIsListening(false);
-          setMicError(true);
+          if (event.error === 'not-allowed') {
+            setMicError(true);
+          }
         };
 
         recognitionRef.current = recognition;
@@ -77,7 +80,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
         setMicError(true);
       }
     }
-  }, [language, step, transcript]);
+  }, [language, transcript]);
 
   const speak = (text: string) => {
     if (typeof window === "undefined" || !window.speechSynthesis) return;
@@ -105,9 +108,9 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
     try {
       let systemPrompt = "";
       if (step === 3) {
-        systemPrompt = `Extract stock details from voice. Context: ${formData.businessType}. Return ONLY JSON: {"name": "item", "qty": number, "unit": "kg/L/etc", "emoji": "emoji"}`;
+        systemPrompt = `Extract stock/inventory details from voice. Context: ${formData.businessType}. Return ONLY JSON: {"name": "item name", "qty": number, "unit": "kg/L/pieces/etc", "emoji": "emoji"}`;
       } else if (step === 4) {
-        systemPrompt = `Extract sale details. Return ONLY JSON: {"productName": "item", "price": number, "quantity": number}`;
+        systemPrompt = `Extract sale details from voice. Return ONLY JSON: {"productName": "item", "price": number, "quantity": number}`;
       }
 
       const response = await fetch("/api/chat", {
@@ -122,7 +125,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
         const parsed = JSON.parse(jsonMatch[0]);
         if (step === 3) {
           setFormData(prev => ({ ...prev, firstStock: parsed }));
-          speak(language === 'hi-IN' ? "स्टॉक जोड़ दिया गया है" : "Stock added");
+          speak(language === 'hi-IN' ? "जोड़ दिया गया है" : "Stock added");
         } else if (step === 4) {
           setFormData(prev => ({ ...prev, firstSale: parsed }));
           speak(language === 'hi-IN' ? "बिक्री दर्ज हो गई" : "Sale recorded");
@@ -145,6 +148,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
     };
     localStorage.setItem("bolvyapar_profile", JSON.stringify(finalProfile));
     
+    // Initialize stock data with the first item
     if (formData.firstStock) {
       const stockItem = {
         ...formData.firstStock,
@@ -157,6 +161,7 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
       localStorage.setItem("bolvyapar_stock_data", JSON.stringify([stockItem]));
     }
 
+    // Initialize sales history with the first sale
     if (formData.firstSale) {
       const saleItem = {
         ...formData.firstSale,
@@ -244,7 +249,11 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
             </div>
             <div className="grid grid-cols-2 gap-4">
               {BUSINESS_TYPES.map((type) => (
-                <button key={type.id} onClick={() => { setFormData({...formData, businessType: type.id}); setStep(3); }} className={cn("flex flex-col items-center justify-center p-6 rounded-[32px] border transition-all active:scale-95", formData.businessType === type.id ? "bg-[#38BDF8] border-[#38BDF8]" : "bg-white/5 border-white/10")}>
+                <button 
+                  key={type.id} 
+                  onClick={() => { setFormData({...formData, businessType: type.id}); setStep(3); }} 
+                  className={cn("flex flex-col items-center justify-center p-6 rounded-[32px] border transition-all active:scale-95", formData.businessType === type.id ? "bg-[#38BDF8] border-[#38BDF8]" : "bg-white/5 border-white/10")}
+                >
                   <span className="text-4xl mb-3">{type.emoji}</span>
                   <span className="text-[11px] font-black text-white uppercase text-center leading-tight">{language === 'hi-IN' ? type.hi : type.en}</span>
                 </button>
@@ -262,7 +271,15 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
             
             <div className="flex flex-col items-center space-y-8">
               <div className="relative">
-                <button onClick={startListening} disabled={isProcessing} className={cn("h-32 w-32 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90", isListening ? "bg-red-500 animate-pulse" : "bg-[#C45000]", (step === 3 ? formData.firstStock : formData.firstSale) && "bg-emerald-500")}>
+                <button 
+                  onClick={startListening} 
+                  disabled={isProcessing} 
+                  className={cn(
+                    "h-32 w-32 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90", 
+                    isListening ? "bg-red-500 animate-pulse" : "bg-[#C45000]",
+                    (step === 3 ? formData.firstStock : formData.firstSale) && "ring-4 ring-emerald-500"
+                  )}
+                >
                   {isProcessing ? <Loader2 className="text-white animate-spin" size={48} /> : 
                    (step === 3 ? formData.firstStock : formData.firstSale) ? <CheckCircle2 className="text-white" size={48} /> : <Mic className="text-white" size={48} />}
                 </button>
@@ -275,19 +292,29 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
 
               <p className="text-white/40 text-sm italic text-center px-4">{step === 3 ? getStep3Strings().instr : texts.step4Instr}</p>
 
-              {(micError || true) && !isListening && (
-                <div className="w-full space-y-4">
-                  <div className="relative">
-                    <Input value={manualInput} onChange={e => setManualInput(e.target.value)} placeholder={texts.typeHere} className="h-16 rounded-2xl bg-white/5 border-white/10 text-white" />
-                    <Button onClick={() => handleVoiceAction(manualInput)} disabled={!manualInput.trim() || isProcessing} className="absolute right-2 top-2 h-12 bg-[#38BDF8] text-[#0D2240] font-black px-4 rounded-xl">{texts.save}</Button>
-                  </div>
-                  {micError && (
-                    <div className="flex items-center gap-2 text-amber-400 text-[10px] font-bold uppercase justify-center">
-                      <AlertCircle size={14} /> Mic permission needed or not supported
-                    </div>
-                  )}
+              {/* Show text input as fallback or alternative */}
+              <div className="w-full space-y-4">
+                <div className="relative">
+                  <Input 
+                    value={manualInput} 
+                    onChange={e => setManualInput(e.target.value)} 
+                    placeholder={texts.typeHere} 
+                    className="h-16 rounded-2xl bg-white/5 border-white/10 text-white" 
+                  />
+                  <Button 
+                    onClick={() => handleVoiceAction(manualInput)} 
+                    disabled={!manualInput.trim() || isProcessing} 
+                    className="absolute right-2 top-2 h-12 bg-[#38BDF8] text-[#0D2240] font-black px-4 rounded-xl"
+                  >
+                    {texts.save}
+                  </Button>
                 </div>
-              )}
+                {micError && (
+                  <div className="flex items-center gap-2 text-amber-400 text-[10px] font-bold uppercase justify-center">
+                    <AlertCircle size={14} /> Mic permission needed or not supported
+                  </div>
+                )}
+              </div>
 
               {(step === 3 ? formData.firstStock : formData.firstSale) && (
                 <div className="bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/30 text-emerald-400 text-sm font-bold flex gap-2 animate-in zoom-in-95">
@@ -295,7 +322,13 @@ export default function FirstLaunchFlow({ onComplete, language }: FirstLaunchFlo
                 </div>
               )}
 
-              <Button disabled={!(step === 3 ? formData.firstStock : formData.firstSale)} onClick={() => setStep(step + 1)} className="w-full h-16 rounded-2xl bg-white/10 text-white font-black">{texts.next}</Button>
+              <Button 
+                disabled={!(step === 3 ? formData.firstStock : formData.firstSale)} 
+                onClick={() => setStep(step + 1)} 
+                className="w-full h-16 rounded-2xl bg-[#38BDF8] text-[#0D2240] font-black text-lg"
+              >
+                {texts.next}
+              </Button>
             </div>
           </div>
         )}
