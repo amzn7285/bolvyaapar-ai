@@ -13,17 +13,13 @@ export default function Home() {
   const [userRole, setUserRole] = useState<"owner" | "helper" | null>(null);
   const [language, setLanguage] = useState<"hi-IN" | "en-IN">("hi-IN");
   const [hasProfile, setHasProfile] = useState(false);
+  const [isFirstTime, setIsFirstTime] = useState(false);
 
   useEffect(() => {
     const savedLang = localStorage.getItem(LANG_KEY) as "hi-IN" | "en-IN";
-    if (savedLang) {
-      setLanguage(savedLang);
-    }
-
+    if (savedLang) setLanguage(savedLang);
     const profile = localStorage.getItem(PROFILE_KEY);
-    if (profile) {
-      setHasProfile(true);
-    }
+    if (profile) setHasProfile(true);
   }, []);
 
   const handleAuth = (role: "owner" | "helper") => {
@@ -34,6 +30,7 @@ export default function Home() {
   const handleLogout = () => {
     setAuthenticated(false);
     setUserRole(null);
+    setIsFirstTime(false);
   };
 
   const handleLanguageChange = (lang: "hi-IN" | "en-IN") => {
@@ -43,27 +40,24 @@ export default function Home() {
 
   const handleProfileComplete = () => {
     setHasProfile(true);
+    setIsFirstTime(true); // Flag to open Stock tab on first launch after setup
   };
 
   if (!authenticated) {
-    return (
-      <PinLock 
-        onAuth={handleAuth} 
-        language={language} 
-        onLanguageChange={handleLanguageChange} 
-      />
-    );
+    return <PinLock onAuth={handleAuth} language={language} onLanguageChange={handleLanguageChange} />;
   }
 
+  // Show setup flow only for owner on first launch
   if (!hasProfile && userRole === "owner") {
     return <FirstLaunchFlow onComplete={handleProfileComplete} language={language} />;
   }
 
   return (
-    <Dashboard 
-      role={userRole!} 
-      language={language} 
-      onLogout={handleLogout} 
+    <Dashboard
+      role={userRole!}
+      language={language}
+      onLogout={handleLogout}
+      openStockOnLoad={isFirstTime} // Automatically switches to Stock tab after setup
     />
   );
 }
