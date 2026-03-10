@@ -305,7 +305,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
              <span className="text-[#FFB300] font-black text-[10px]">AI</span>
           </div>
           <h1 className="text-xl font-black text-white tracking-tight truncate max-w-[180px]">
-            {profile?.shopName || 'BolVyaapar Shop'}
+            {profile?.shopName || 'BolVyaapar AI Shop'}
           </h1>
           <p className="text-[10px] text-[#FFB300] font-bold italic tracking-tight mb-0.5">
             {texts.tagline}
