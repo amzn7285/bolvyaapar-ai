@@ -76,13 +76,13 @@ export default function VoiceButton({ role, language, privateMode, onTransaction
       const unitMatch = query.match(/\b(kg|kilo|किलो|litre|liter|L|gram|gm|piece|pcs|bottle|packet)\b/i);
       const localUnit = unitMatch ? unitMatch[1] : '';
       const localName = query.replace(/\b(sold|becha|diya|बेचा)\b/gi, '').replace(/(\d+(\.\d+)?)\s*(kg|kilo|किलो|litre|liter|piece|pcs|bottle|packet)?/gi, '').trim() || query;
-      finalizeTransaction({ 
-        spokenResponse: language === "hi-IN" ? "बिक्री दर्ज हो गई" : "Sale recorded", 
-        productName: localName, 
-        price: 0, 
-        quantity: localQty, 
-        unit: localUnit, 
-        intent: "sale" 
+      finalizeTransaction({
+        spokenResponse: language === "hi-IN" ? "बिक्री दर्ज हो गई" : "Sale recorded",
+        productName: localName,
+        price: 0,
+        quantity: localQty,
+        unit: localUnit,
+        intent: "sale"
       });
       setIsProcessing(false);
       return;
@@ -91,18 +91,32 @@ export default function VoiceButton({ role, language, privateMode, onTransaction
     try {
       const stockCategories = stock.map(s => s.name).join(", ");
       const khataNames = khata.map(c => c.name).join(", ");
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
       const systemPrompt = `You are BolVyaapar AI assistant for an Indian ${businessType} shop owner.
 Parse the voice command and return ONLY a raw JSON object. No explanation. No markdown. No extra text. Just JSON.
-Stock items available: ${stockCategories || "none"}. Known credit customers: ${khataNames || "none"}.
+Stock items: ${stockCategories || "none"}. Known credit customers: ${khataNames || "none"}.
 Language for spokenResponse: ${language === "hi-IN" ? "Hindi" : "English"}.
-JSON format: {"intent":"sale","spokenResponse":"brief confirm in Hindi/English","productName":"exact item name","customerName":"","price":0,"quantity":1,"unit":"","description":"","advance":0,"message":"","suggestedCategory":"matching stock item name or empty"}
-Intent must be one of: sale, expense, credit, payment, job_create, job_complete, reminder.
-IMPORTANT: Extract quantity and unit accurately. Example: 'sold rice 5 kg' = quantity:5, unit:'kg', productName:'rice'`;
+Today: ${new Date().toISOString()}. Tomorrow: ${tomorrow.toISOString()}.
 
-      const response = await fetch("/api/chat", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ userMessage: query, systemPrompt }) 
+Intent must be one of: sale, expense, credit, payment, job_create, job_complete, reminder.
+
+STRICT INTENT RULES:
+- If input contains "kal", "tomorrow", "remind", "याद", "याद दिलाना", "ko bolna hai", "lena hai", "dena hai", "yaad rakhna" -> INTENT = reminder.
+- If input contains "becha", "sold", "diya", "sales" or just product + price -> INTENT = sale.
+- If input contains "kharcha", "expense", "kharch" -> INTENT = expense.
+- If input contains "udhar", "credit", "khate mein likho" -> INTENT = credit.
+- If input contains "payment mila", "paisa aaya", "jama kiya" -> INTENT = payment.
+
+JSON format: {"intent":"sale|expense|credit|payment|job_create|job_complete|reminder","spokenResponse":"brief confirm in ${language === "hi-IN" ? 'Hindi' : 'English'}","productName":"exact item name","customerName":"","price":0,"quantity":1,"unit":"","description":"","advance":0,"message":"full task/reminder text","date":"ISO date string","suggestedCategory":"matching stock item name or empty"}
+
+IMPORTANT: Extract quantity and unit accurately. Example: 'sold rice 5 kg' = quantity:5, unit:'kg', productName:'rice'. Never default quantity to 1 if a number is spoken.`;
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userMessage: query, systemPrompt })
       });
       const data = await response.json();
       const jsonMatch = data.reply?.match(/\{[\s\S]*\}/);
@@ -111,12 +125,16 @@ IMPORTANT: Extract quantity and unit accurately. Example: 'sold rice 5 kg' = qua
       } else {
         const qtyMatch = query.match(/(\d+(\.\d+)?)/);
         const localQty = qtyMatch ? parseFloat(qtyMatch[1]) : 1;
-        finalizeTransaction({ 
-          spokenResponse: language === "hi-IN" ? "बिक्री दर्ज हो गई" : "Sale recorded", 
-          productName: query, 
-          price: 0, 
-          quantity: localQty, 
-          intent: "sale" 
+        const unitMatch = query.match(/\b(kg|kilo|किलो|litre|liter|L|gram|gm|piece|pcs|bottle|packet)\b/i);
+        const localUnit = unitMatch ? unitMatch[1] : '';
+        const localName = query.replace(/\b(sold|becha|diya|बेचा)\b/gi, '').replace(/(\d+(\.\d+)?)\s*(kg|kilo|किलो|litre|liter|piece|pcs|bottle|packet)?/gi, '').trim() || query;
+        finalizeTransaction({
+          spokenResponse: language === "hi-IN" ? "बिक्री दर्ज हो गई" : "Sale recorded",
+          productName: localName,
+          price: 0,
+          quantity: localQty,
+          unit: localUnit,
+          intent: "sale"
         });
       }
     } catch (err) {
@@ -170,9 +188,9 @@ IMPORTANT: Extract quantity and unit accurately. Example: 'sold rice 5 kg' = qua
     const interval = setInterval(() => {
       timeLeft -= 1;
       setAutoConfirmTimer(timeLeft);
-      if (timeLeft <= 0) { 
-        clearInterval(interval); 
-        confirmTransaction(txn); 
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        confirmTransaction(txn);
       }
     }, 1000);
     (window as any)._pendingInterval = interval;
