@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,6 +30,17 @@ const JOBS_STORAGE_KEY = "bolvyaapar_jobs_data";
 const PROFILE_KEY = "bolvyaapar_profile";
 const REMINDERS_STORAGE_KEY = "bolvyaapar_reminders_data";
 const BRIEFING_KEY = "bolvyaapar_last_briefing_date";
+
+const PRODUCT_SYNONYMS: Record<string, string[]> = {
+  'rice': ['rice', 'chawal', 'चावल'],
+  'wheat': ['wheat', 'atta', 'gehun', 'आटा', 'गेहूं'],
+  'milk': ['milk', 'doodh', 'दूध'],
+  'oil': ['oil', 'tel', 'तेल'],
+  'sugar': ['sugar', 'chini', 'चीनी'],
+  'dal': ['dal', 'lentil', 'दाल'],
+  'soap': ['soap', 'sabun', 'साबुन'],
+  'salt': ['salt', 'namak', 'नमक'],
+};
 
 const BUSINESS_TYPES = [
   { id: 'kirana', emoji: '🏪', en: "Kirana Store", hi: "किराना स्टोर", isService: false },
@@ -237,26 +249,40 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
     setSales(updatedSales);
     localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(updatedSales));
 
-    // STOCK REDUCTION LOGIC
+    // STOCK REDUCTION LOGIC with Synonyms
     const soldQty = Number(details.quantity) || 0;
-    const productSpoken = (details.productName || "").toLowerCase();
+    const productSpoken = (details.productName || "").toLowerCase().trim();
     
     const updatedStock = stock.map(item => {
-      const itemName = (item.name || "").toLowerCase();
-      const itemHiName = (item.hiName || "").toLowerCase();
+      const itemName = (item.name || "").toLowerCase().trim();
+      const itemHiName = (item.hiName || "").toLowerCase().trim();
       
       let isMatch = false;
       // 1. Direct category match from AI mapping
       if (details.matchedCategory === item.name) {
         isMatch = true;
       } 
-      // 2. Name contains spoken word or vice-versa
-      else if (productSpoken && itemName && (itemName.includes(productSpoken) || productSpoken.includes(itemName))) {
-        isMatch = true;
-      } 
-      // 3. Hindi Name matching
-      else if (productSpoken && itemHiName && (itemHiName.includes(productSpoken) || productSpoken.includes(itemHiName))) {
-        isMatch = true;
+      
+      if (!isMatch && productSpoken) {
+        // 2. Exact or substring match
+        if (itemName === productSpoken || productSpoken.includes(itemName) || itemName.includes(productSpoken) ||
+            itemHiName === productSpoken || productSpoken.includes(itemHiName) || itemHiName.includes(productSpoken)) {
+          isMatch = true;
+        }
+
+        // 3. Synonym Group Match
+        if (!isMatch) {
+          for (const group of Object.values(PRODUCT_SYNONYMS)) {
+            const spokenInGroup = group.some(s => productSpoken.includes(s) || s.includes(productSpoken));
+            const itemNameInGroup = group.some(s => itemName.includes(s) || s.includes(itemName));
+            const itemHiNameInGroup = group.some(s => itemHiName.includes(s) || s.includes(itemHiName));
+            
+            if (spokenInGroup && (itemNameInGroup || itemHiNameInGroup)) {
+              isMatch = true;
+              break;
+            }
+          }
+        }
       }
       
       if (isMatch) {
