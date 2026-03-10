@@ -136,7 +136,7 @@ export default function Dashboard({ role, language, onLogout }: DashboardProps) 
       setJobs(updatedJobs);
       localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(updatedJobs));
       
-      const shopName = profile?.shopName || "BolVyaapar Shop";
+      const shopName = profile?.shopName || "BolVyaapar AI Shop";
       const msg = language === 'hi-IN' 
         ? `नमस्ते ${details.customerName}, आपका काम तैयार है — आ जाइये। धन्यवाद! - ${shopName}`
         : `Hi ${details.customerName}, your work is ready - please visit us. Thanks! - ${shopName}`;
